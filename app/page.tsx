@@ -1,4 +1,5 @@
-import MapClientWrapper from './components/mapClientWrapper';
+import MapClientWrapper from '../components/map/mapClientWrapper';
+import EventList from '../components/common/eventsList'
 
 export default function HomePage() {
   return (
