@@ -42,12 +42,14 @@ export default function SignUp() {
             id: authData.user.id,
             email: email,
             full_name: fullName,
-          })
-          .select()
-          .single();
+          });
 
-        if (profileError && profileError.code !== '23505') { // Ignore duplicate key violation errors
+        if (profileError) {
           console.error('Error creating profile:', profileError);
+          // Only show the error to user if it's not a duplicate key violation
+          if (profileError.code !== '23505') {
+            setError(`Error creating profile: ${profileError.message}`);
+          }
         }
       }
 
