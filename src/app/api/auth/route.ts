@@ -83,7 +83,7 @@ export async function POST(request: NextRequest) {
         console.error('Error signing out:', error);
         return NextResponse.json({ error: error.message }, { status: 500 });
       }
-      
+            
       // Clear all auth cookies from response
       const response = NextResponse.json({ success: true });
       

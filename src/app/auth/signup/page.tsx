@@ -42,6 +42,7 @@ export default function SignUp() {
             id: authData.user.id,
             email: email,
             full_name: fullName,
+            role: 'user'  // Ensure role is set to 'user' by default
           });
 
         if (profileError) {

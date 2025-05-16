@@ -36,42 +36,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setIsLoading(true);
       
       // First check client-side session with explicit typing
-      const { data } = await supabase.auth.getSession();
+      const { data, error } = await supabase.auth.getSession();
+      
+      if (error) {
+        console.error('Error getting session in AuthContext:', error);
+        setUser(null);
+        setSession(null);
+        return;
+      }
       
       if (data.session) {
         // If we have a session client-side, use it
+        console.log('Found session in AuthContext:', data.session.user.id);
         setUser(data.session.user);
         setSession(data.session);
       } else {
-        // Only check server if client doesn't have session
-        try {
-          const response = await fetch('/api/auth', {
-            cache: 'no-store',
-            headers: {
-              'x-timestamp': Date.now().toString()
-            }
-          });
-          
-          const serverData = await response.json();
-          
-          // Be safe when accessing potentially unknown shape
-          const serverSession = serverData?.session ?? null;
-          const serverUser = serverData?.user ?? null;
-          
-          if (serverSession) {
-            setUser(serverUser);
-            setSession(serverSession);
-          } else {
-            setUser(null);
-            setSession(null);
-          }
-        } catch (error) {
-          console.error('Error fetching server auth state:', error);
-          
-          // Clear state on error - client already said we have no session
-          setUser(null);
-          setSession(null);
-        }
+        console.log('No session found in AuthContext');
+        setUser(null);
+        setSession(null);
       }
       
       lastRefreshTime.current = Date.now();
@@ -87,12 +69,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     // Fetch initial session only once on mount
+    console.log('AuthContext mounted, fetching initial session');
     refreshAuth();
 
     // Subscribe to auth changes with Supabase client
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, newSession) => {
-        console.log('Auth state changed:', event);
+        console.log('Auth state changed:', event, newSession?.user?.id);
         
         // Only update if there's an actual change to avoid loops
         const sessionChanged = 
@@ -100,6 +83,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           (newSession?.user?.id !== session?.user?.id);
           
         if (sessionChanged) {
+          console.log('Session changed, updating context');
           setSession(newSession);
           setUser(newSession?.user ?? null);
           // Use setTimeout to avoid immediate refresh that could cause loops
@@ -111,6 +95,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     );
 
     return () => {
+      console.log('Unsubscribing from auth changes');
       subscription.unsubscribe();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -119,25 +104,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = async () => {
     setIsLoading(true);
     try {
-      // First sign out with client-side Supabase
-      await supabase.auth.signOut();
+      console.log('Signing out user');
       
-      // Then call our API route to clear server-side session
-      await fetch('/api/auth', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ action: 'signout' }),
-      });
+      // Sign out with client-side Supabase
+      const { error } = await supabase.auth.signOut();
+      
+      if (error) {
+        console.error('Error signing out:', error);
+      } else {
+        console.log('Sign out successful');
+      }
       
       // Clear state
       setUser(null);
       setSession(null);
       
-      // We'll handle actual navigation in the sign-out page
     } catch (error) {
-      console.error('Error signing out:', error);
+      console.error('Error in signOut function:', error);
       
       // Even if there's an error, clear the local state
       setUser(null);

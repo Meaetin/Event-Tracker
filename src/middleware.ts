@@ -1,53 +1,91 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { createServerClient, type CookieOptions } from '@supabase/ssr';
 
 export async function middleware(req: NextRequest) {
+  console.log('Middleware running for path:', req.nextUrl.pathname);
+  
+  // Create a response object that we'll modify
   const res = NextResponse.next();
   
-  // Get the token from the cookies
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+  // Only handle dashboard routes
+  const isAuthRoute = req.nextUrl.pathname.startsWith('/dashboard');
   
-  // Create a Supabase client
-  const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-    auth: {
-      persistSession: false,
-      detectSessionInUrl: false,
-      autoRefreshToken: false,
-    },
-    global: {
-      headers: {
-        cookie: req.headers.get('cookie') || '',
+  if (!isAuthRoute) {
+    return res;
+  }
+  
+  // Get cookies from the request
+  const supabaseCookies = req.cookies.getAll();
+  
+  // If there are no cookies at all, redirect to login
+  if (supabaseCookies.length === 0) {
+    console.log('No cookies found, redirecting to login');
+    return NextResponse.redirect(new URL('/auth/login', req.url));
+  }
+  
+  // Create a supabase client with updated API
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll: () => {
+          return req.cookies.getAll().map((cookie) => ({
+            name: cookie.name,
+            value: cookie.value,
+          }));
+        },
+        setAll: (cookies) => {
+          cookies.forEach((cookie) => {
+            res.cookies.set(cookie.name, cookie.value, cookie.options);
+          });
+        },
       },
-    },
-  });
+    }
+  );
   
-  // Check if the user is authenticated
-  const { data: { session } } = await supabase.auth.getSession();
-  
-  // Add auth state to request headers for server components
-  const requestHeaders = new Headers(req.headers);
-  requestHeaders.set('x-auth-state', session ? 'authenticated' : 'unauthenticated');
-  
-  return NextResponse.next({
-    request: {
-      headers: requestHeaders,
-    },
-  });
+  try {
+    // Check the session
+    const { data } = await supabase.auth.getSession();
+    
+    if (!data.session) {
+      console.log('No valid session found, redirecting to login');
+      return NextResponse.redirect(new URL('/auth/login', req.url));
+    }
+    
+    console.log('Session found for user:', data.session.user.id);
+    
+    // Admin route check
+    const isAdminRoute = req.nextUrl.pathname.startsWith('/dashboard/admin');
+    
+    // Check admin access if needed
+    if (isAdminRoute) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', data.session.user.id)
+        .single();
+      
+      if (!profile || profile.role !== 'admin') {
+        console.log('User is not an admin, redirecting');
+        return NextResponse.redirect(new URL('/dashboard/user', req.url));
+      }
+    }
+    
+    // Add user info to headers for server components
+    res.headers.set('x-user-id', data.session.user.id);
+    res.headers.set('x-auth-state', 'authenticated');
+    
+    return res;
+    
+  } catch (err) {
+    console.error('Error in auth middleware:', err);
+    // On error, continue but don't set auth headers
+    return res;
+  }
 }
 
-// Add paths that should trigger this middleware
 export const config = {
-  matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - public (public files)
-     * - auth routes (for unauthenticated access)
-     */
-    '/((?!_next/static|_next/image|favicon.ico|public|auth).*)',
-  ],
+  matcher: ['/dashboard/:path*'],
 }; 

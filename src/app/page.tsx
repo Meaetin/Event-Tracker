@@ -1,7 +1,6 @@
 // import MapClientWrapper from '../components/map/mapClientWrapper';
 // import EventList from '../components/common/eventsList'
 
-import Header from './components/Header';
 import ProtectedContent from './components/ProtectedContent';
 import { Suspense } from 'react';
 import { Metadata } from 'next';
@@ -22,10 +21,6 @@ export const dynamic = 'force-dynamic';
 export default function HomePage() {
   return (
     <>
-      <Suspense fallback={<div>Loading header...</div>}>
-        <Header />
-      </Suspense>
-      
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <h1 className="text-3xl font-bold mb-6">Welcome to My App</h1>
         
