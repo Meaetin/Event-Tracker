@@ -1,66 +1,62 @@
 "use client";
 
 import { useAuth } from '../context/AuthContext';
-import Link from 'next/link';
 import { useEffect, useState, useRef } from 'react';
 import { supabase } from '../lib/supabase/supabaseClient';
+import Link from 'next/link';
 
 export default function ProtectedContent() {
   const { user, isLoading } = useAuth();
-  const [checkedServerSession, setCheckedServerSession] = useState(false);
-  const isCheckingSession = useRef(false);
-  const lastCheckTime = useRef(0);
+  const [userProfile, setUserProfile] = useState<any>(null);
+  const [isLoadingProfile, setIsLoadingProfile] = useState(true);
+  const isMounted = useRef(true);
+  const profileFetched = useRef(false);
 
-  // Add extra check to handle direct navigation to the page
   useEffect(() => {
-    // Only run this once and only if we're not already loading
-    if (checkedServerSession || isLoading || isCheckingSession.current) return;
+    isMounted.current = true;
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
 
-    const checkSession = async () => {
-      // Prevent multiple checks in a short time period
-      const now = Date.now();
-      if (now - lastCheckTime.current < 3000) {
-        setCheckedServerSession(true);
+  useEffect(() => {
+    async function loadProfile() {
+      if (!user || profileFetched.current) {
+        if (isMounted.current) {
+          setIsLoadingProfile(false);
+        }
         return;
       }
 
       try {
-        isCheckingSession.current = true;
-        lastCheckTime.current = now;
+        profileFetched.current = true;
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .single();
         
-        // Check client-side session first - just check if it exists, don't use the data
-        // to avoid unnecessary re-renders
-        const { data } = await supabase.auth.getSession();
-        
-        // Only force a refresh if there's a definite mismatch between what the
-        // client has and what the context thinks we have
-        const definiteAuthMismatch = 
-          (data.session && !user) || 
-          (!data.session && user);
-          
-        if (definiteAuthMismatch) {
-          console.log('Session state mismatch, refreshing...');
-          // Only do a hard refresh if we absolutely need to
-          window.location.reload();
+        if (isMounted.current) {
+          setUserProfile(profile);
         }
-        
-        setCheckedServerSession(true);
       } catch (error) {
-        console.error('Error checking session:', error);
-        setCheckedServerSession(true);
+        console.error('Error loading profile:', error);
       } finally {
-        isCheckingSession.current = false;
+        if (isMounted.current) {
+          setIsLoadingProfile(false);
+        }
       }
-    };
+    }
 
-    checkSession();
-  }, [user, isLoading, checkedServerSession]);
+    if (!isLoading) {
+      loadProfile();
+    }
+  }, [user, isLoading]);
 
-  if (isLoading || !checkedServerSession) {
+  if (isLoading || isLoadingProfile) {
     return (
-      <div className="bg-white p-6 rounded-lg shadow-md animate-pulse">
-        <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
-        <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+      <div className="flex justify-center items-center min-h-[60vh]">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
       </div>
     );
   }
@@ -68,22 +64,22 @@ export default function ProtectedContent() {
   if (!user) {
     return (
       <div className="bg-white p-6 rounded-lg shadow-md">
-        <h2 className="text-xl font-bold mb-4">Protected Content</h2>
-        <p className="mb-4">
-          You need to be logged in to view this content.
+        <h2 className="text-2xl font-bold mb-6">Welcome to My App</h2>
+        <p className="mb-8 text-gray-600">
+          Please sign in to access your personalized dashboard and features.
         </p>
         <div className="flex space-x-4">
           <Link 
-            href="/auth/login" 
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+            href="/auth/login"
+            className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
           >
-            Log In
+            Sign In
           </Link>
           <Link 
-            href="/auth/signup" 
-            className="px-4 py-2 bg-gray-100 rounded-md hover:bg-gray-200"
+            href="/auth/signup"
+            className="px-6 py-2 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
           >
-            Sign Up
+            Create Account
           </Link>
         </div>
       </div>
@@ -92,18 +88,34 @@ export default function ProtectedContent() {
 
   return (
     <div className="bg-white p-6 rounded-lg shadow-md">
-      <h2 className="text-xl font-bold mb-4">Welcome, {user.user_metadata.full_name || user.email}!</h2>
-      <p className="mb-4">
-        This is protected content that only authenticated users can see.
-      </p>
-      <div className="bg-gray-50 p-4 rounded-md">
-        <h3 className="font-medium mb-2">Your Profile Information:</h3>
-        <ul className="list-disc pl-5">
-          <li><strong>User ID:</strong> {user.id}</li>
-          <li><strong>Email:</strong> {user.email}</li>
-          <li><strong>Full Name:</strong> {user.user_metadata.full_name || 'Not provided'}</li>
-          <li><strong>Last Sign In:</strong> {new Date(user.last_sign_in_at || '').toLocaleString()}</li>
-        </ul>
+      <div className="flex justify-between items-start mb-6">
+        <div>
+          <h2 className="text-2xl font-bold">Welcome back, {user.user_metadata.full_name || user.email}!</h2>
+          <p className="text-gray-600 mt-2">Access your dashboard to manage your content and settings.</p>
+        </div>
+      </div>
+
+      <div className="grid md:grid-cols-2 gap-6">
+        <Link
+          href={userProfile?.role === 'admin' ? '/dashboard/admin' : '/dashboard/user'}
+          className="p-6 border rounded-lg hover:border-blue-500 transition-colors group"
+        >
+          <h3 className="text-xl font-semibold group-hover:text-blue-600">Go to Dashboard →</h3>
+          <p className="text-gray-600 mt-2">
+            {userProfile?.role === 'admin' 
+              ? 'Manage users, content, and system settings'
+              : 'View your personalized dashboard and settings'}
+          </p>
+        </Link>
+
+        <div className="p-6 border rounded-lg bg-gray-50">
+          <h3 className="text-xl font-semibold">Profile Overview</h3>
+          <div className="mt-4 space-y-2 text-gray-600">
+            <p><strong>Email:</strong> {user.email}</p>
+            <p><strong>Role:</strong> {userProfile?.role || 'user'}</p>
+            <p><strong>Last Login:</strong> {new Date(user.last_sign_in_at || '').toLocaleString()}</p>
+          </div>
+        </div>
       </div>
     </div>
   );

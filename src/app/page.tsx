@@ -24,7 +24,7 @@ export default function HomePage() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <h1 className="text-3xl font-bold mb-6">Welcome to My App</h1>
         
-        <Suspense fallback={<div className="bg-white p-6 rounded-lg shadow-md animate-pulse">
+        <Suspense key="protected-content" fallback={<div className="bg-white p-6 rounded-lg shadow-md animate-pulse">
           <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
           <div className="h-4 bg-gray-200 rounded w-1/2"></div>
         </div>}>

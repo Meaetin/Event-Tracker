@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, ReactNode, useRef } from 'react';
+import { createContext, useContext, useEffect, useState, ReactNode, useRef, useCallback } from 'react';
 import { supabase } from '../lib/supabase/supabaseClient';
 import { Session, User } from '@supabase/supabase-js';
 import { useRouter } from 'next/navigation';
@@ -22,10 +22,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const isRefreshing = useRef(false);
   const lastRefreshTime = useRef(0);
+  const mounted = useRef(true);
+  const initialized = useRef(false);
 
-  // Function to fetch session from the server route
-  const refreshAuth = async () => {
-    // Prevent multiple refreshes within a short time period
+  const refreshAuth = useCallback(async () => {
+    if (!mounted.current) return;
+    
     const now = Date.now();
     if (isRefreshing.current || now - lastRefreshTime.current < 2000) {
       return;
@@ -33,102 +35,107 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     try {
       isRefreshing.current = true;
-      setIsLoading(true);
       
-      // First check client-side session with explicit typing
-      const { data, error } = await supabase.auth.getSession();
+      const { data: { session: currentSession }, error: sessionError } = await supabase.auth.getSession();
       
-      if (error) {
-        console.error('Error getting session in AuthContext:', error);
+      if (sessionError) {
+        throw sessionError;
+      }
+
+      if (currentSession) {
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        if (!userError && user && mounted.current) {
+          setUser(user);
+          setSession(currentSession);
+        } else if (mounted.current) {
+          setUser(null);
+          setSession(null);
+        }
+      } else if (mounted.current) {
         setUser(null);
         setSession(null);
-        return;
       }
       
-      if (data.session) {
-        // If we have a session client-side, use it
-        console.log('Found session in AuthContext:', data.session.user.id);
-        setUser(data.session.user);
-        setSession(data.session);
-      } else {
-        console.log('No session found in AuthContext');
-        setUser(null);
-        setSession(null);
-      }
-      
-      lastRefreshTime.current = Date.now();
+      lastRefreshTime.current = now;
     } catch (error) {
       console.error('Error refreshing auth state:', error);
+      if (mounted.current) {
+        setUser(null);
+        setSession(null);
+      }
+    } finally {
+      isRefreshing.current = false;
+      if (mounted.current) {
+        setIsLoading(false);
+      }
+      initialized.current = true;
+    }
+  }, []);
+
+  const handleAuthChange = useCallback(async (event: string, newSession: Session | null) => {
+    if (!mounted.current || !initialized.current) return;
+
+    if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+      try {
+        const { data: { user }, error } = await supabase.auth.getUser();
+        if (!error && user && mounted.current) {
+          setUser(user);
+          setSession(newSession);
+          
+          // Only redirect from login page, not from home page
+          const path = window.location.pathname;
+          if (path === '/auth/login') {
+            router.push('/dashboard/admin');
+          }
+        }
+      } catch (error) {
+        console.error('Error in auth change handler:', error);
+      }
+    } else if (event === 'SIGNED_OUT' && mounted.current) {
       setUser(null);
       setSession(null);
-    } finally {
-      setIsLoading(false);
-      isRefreshing.current = false;
+      router.push('/auth/login');
     }
-  };
+  }, [router]);
 
   useEffect(() => {
-    // Fetch initial session only once on mount
-    console.log('AuthContext mounted, fetching initial session');
-    refreshAuth();
+    mounted.current = true;
+    
+    const initializeAuth = async () => {
+      if (!mounted.current) return;
+      await refreshAuth();
+    };
 
-    // Subscribe to auth changes with Supabase client
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, newSession) => {
-        console.log('Auth state changed:', event, newSession?.user?.id);
-        
-        // Only update if there's an actual change to avoid loops
-        const sessionChanged = 
-          (!!newSession !== !!session) || 
-          (newSession?.user?.id !== session?.user?.id);
-          
-        if (sessionChanged) {
-          console.log('Session changed, updating context');
-          setSession(newSession);
-          setUser(newSession?.user ?? null);
-          // Use setTimeout to avoid immediate refresh that could cause loops
-          setTimeout(() => {
-            router.refresh();
-          }, 100);
-        }
-      }
-    );
+    initializeAuth();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(handleAuthChange);
 
     return () => {
-      console.log('Unsubscribing from auth changes');
-      subscription.unsubscribe();
-    };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Only run on mount, not when session/user changes
-
-  const signOut = async () => {
-    setIsLoading(true);
-    try {
-      console.log('Signing out user');
-      
-      // Sign out with client-side Supabase
-      const { error } = await supabase.auth.signOut();
-      
-      if (error) {
-        console.error('Error signing out:', error);
-      } else {
-        console.log('Sign out successful');
+      mounted.current = false;
+      if (subscription) {
+        subscription.unsubscribe();
       }
-      
-      // Clear state
-      setUser(null);
-      setSession(null);
-      
+    };
+  }, [refreshAuth, handleAuthChange]);
+
+  const signOut = useCallback(async () => {
+    if (!mounted.current) return;
+    
+    try {
+      await supabase.auth.signOut();
+      if (mounted.current) {
+        setUser(null);
+        setSession(null);
+      }
+      router.push('/auth/login');
     } catch (error) {
       console.error('Error in signOut function:', error);
-      
-      // Even if there's an error, clear the local state
-      setUser(null);
-      setSession(null);
-    } finally {
-      setIsLoading(false);
+      if (mounted.current) {
+        setUser(null);
+        setSession(null);
+      }
     }
-  };
+  }, [router]);
 
   const value = {
     user,

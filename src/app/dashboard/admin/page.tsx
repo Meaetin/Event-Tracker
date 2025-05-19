@@ -16,43 +16,52 @@ export default function AdminDashboard() {
   const [error, setError] = useState('');
 
   useEffect(() => {
+    if (authLoading) return;
+
     async function loadAdminData() {
       if (!authUser) {
         router.push('/auth/login');
         return;
       }
 
-      // Get admin profile
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', authUser.id)
-        .single();
+      try {
+        // Get admin profile
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', authUser.id)
+          .single();
 
-      // Verify admin role
-      if (!profile || profile.role !== 'admin') {
-        router.push('/dashboard/user');
-        return;
+        if (profileError) throw profileError;
+
+        // Verify admin role
+        if (!profile || profile.role !== 'admin') {
+          router.push('/dashboard/user');
+          return;
+        }
+
+        setAdmin(profile);
+
+        // Get all users
+        const { data: allUsers, error: usersError } = await supabase
+          .from('profiles')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        if (usersError) throw usersError;
+        setUsers(allUsers || []);
+
+        // Initial events fetch
+        await fetchEvents();
+      } catch (error) {
+        console.error('Error loading admin data:', error);
+        setError('Failed to load admin data');
+      } finally {
+        setLoading(false);
       }
-
-      setAdmin(profile);
-
-      // Get all users
-      const { data: allUsers } = await supabase
-        .from('profiles')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (allUsers) {
-        setUsers(allUsers);
-      }
-
-      setLoading(false);
     }
 
-    if (!authLoading) {
-      loadAdminData();
-    }
+    loadAdminData();
   }, [authUser, authLoading, router]);
 
   const handleSignOut = async () => {
@@ -99,13 +108,20 @@ export default function AdminDashboard() {
     setLoading(false);
   };
 
-  // Initial load
-  useEffect(() => {
-    fetchEvents();
-  }, []);
+  if (authLoading || loading) {
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+      </div>
+    );
+  }
 
-  if (loading || authLoading) {
-    return <div className="flex justify-center items-center h-screen">Loading...</div>;
+  if (error) {
+    return (
+      <div className="flex justify-center items-center min-h-screen text-red-500">
+        {error}
+      </div>
+    );
   }
 
   return (
@@ -182,7 +198,6 @@ export default function AdminDashboard() {
         >
           {loading ? 'Scraping...' : 'Scrape'}
         </button>
-        {error && <div className="text-red-500 mt-2">{error}</div>}
         <ul className="mt-4">
           {events.map(event => (
             <li key={event.id} className="mb-2">
