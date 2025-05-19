@@ -11,6 +11,9 @@ export default function AdminDashboard() {
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
+  const [url, setUrl] = useState('');
+  const [events, setEvents] = useState<any[]>([]);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     async function loadAdminData() {
@@ -71,6 +74,36 @@ export default function AdminDashboard() {
     }
   }
 
+  // Fetch events from DB
+  const fetchEvents = async () => {
+    const { data, error } = await supabase.from('scraped_events').select('*').order('id', { ascending: false });
+    if (error) setError(error.message);
+    else setEvents(data || []);
+  };
+
+  // Scrape and upload events
+  const handleScrape = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const res = await fetch('/api/scrape', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url }),
+      });
+      if (!res.ok) throw new Error('Scrape failed');
+      await fetchEvents();
+    } catch (e: any) {
+      setError(e.message);
+    }
+    setLoading(false);
+  };
+
+  // Initial load
+  useEffect(() => {
+    fetchEvents();
+  }, []);
+
   if (loading || authLoading) {
     return <div className="flex justify-center items-center h-screen">Loading...</div>;
   }
@@ -130,6 +163,34 @@ export default function AdminDashboard() {
             </tbody>
           </table>
         </div>
+      </div>
+
+      <div className="mt-6">
+        <h2 className="text-xl font-semibold mb-4">Admin Scraper Dashboard</h2>
+        <input
+          type="text"
+          value={url}
+          onChange={e => setUrl(e.target.value)}
+          placeholder="Enter URL to scrape"
+          className="border rounded p-2"
+          style={{ width: 400 }}
+        />
+        <button
+          onClick={handleScrape}
+          disabled={loading || !url}
+          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 ml-2"
+        >
+          {loading ? 'Scraping...' : 'Scrape'}
+        </button>
+        {error && <div className="text-red-500 mt-2">{error}</div>}
+        <ul className="mt-4">
+          {events.map(event => (
+            <li key={event.id} className="mb-2">
+              <img src={event.image_url} alt={event.event_name} className="w-20 h-20 mr-4" />
+              <a href={event.url} target="_blank" rel="noopener noreferrer" className="text-blue-500">{event.event_name}</a>
+            </li>
+          ))}
+        </ul>
       </div>
     </div>
   );
