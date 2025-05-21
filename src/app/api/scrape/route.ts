@@ -15,11 +15,15 @@ export async function POST(req: NextRequest) {
     console.log('Scraped:', scraped);
     // Insert each event into the DB
     for (const item of scraped) {
-      const { data, error } = await supabase.from('scraped_events').insert({
-        article_title: item.title,
-        article_url: item.articleUrl,
-        image_url: item.imageUrl,
-      });
+      const { data, error } = await supabase
+        .from('scraped_events')
+        .insert({
+          article_title: item.title,
+          article_url: item.articleUrl,
+          image_url: item.imageUrl,
+        })
+        .select();
+      
       console.log('Insert result:', data, error);
     }
     return NextResponse.json(scraped);
