@@ -13,5 +13,18 @@ This websites gathers events all over Singapore and plot them on a map for you t
 - Have AI plan out an itinerary from your preferences (future plan)
  
 ## Tech Stack
-  - Typescript
-  - Supabase
+  - Next.js with TypeScript
+  - Supabase (Database & Auth)
+  - Jina AI (Web scraping)
+  - OpenAI (Event processing)
+  - Puppeteer (Initial scraping)
+  - Leaflet (Map display)
+
+
+## Admin Workflow
+
+1. **Initial Scraping**: Admin enters a website URL to scrape event listings
+2. **Review & Approve**: Admin reviews scraped listings and approves relevant ones
+3. **AI Processing**: Approved listings are processed with Jina AI (converts to markdown) and OpenAI (extracts event details)
+4. **Event Creation**: Successfully processed listings become events in the database
+5. **Event Management**: Admin can review, approve, or delete events before they appear on the public map

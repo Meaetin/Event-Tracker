@@ -95,6 +95,7 @@ export default function AdminDashboard() {
   const [activeView, setActiveView] = useState('scrape');
   const [isOnline, setIsOnline] = useState(true);
   const [recoveringData, setRecoveringData] = useState(false);
+  const [processingApproved, setProcessingApproved] = useState(false);
   
   // Use refs to prevent multiple simultaneous operations
   const fetchingRef = useRef(false);
@@ -173,8 +174,8 @@ export default function AdminDashboard() {
 
       const listings = (data as ScrapedEventListing[]) || [];
       setScrapedListings(listings);
-      // Initially show only pending listings
-      setDisplayedListings(listings.filter(l => l.status === 'pending'));
+      // Show all listings except rejected ones
+      setDisplayedListings(listings.filter(l => l.status !== 'rejected'));
     } catch (err: any) {
       console.error('Error fetching scraped listings:', err);
       setError(`Failed to load scraped listings: ${err.message}`);
@@ -520,6 +521,73 @@ export default function AdminDashboard() {
     }
   };
 
+  // Handle processing approved listings with Jina AI and OpenAI
+  const handleProcessApprovedListings = async () => {
+    if (processingApproved || !isOnline) return;
+
+    const approvedListings = scrapedListings.filter(l => l.status === 'approved');
+    
+    if (approvedListings.length === 0) {
+      setError('No approved listings to process');
+      return;
+    }
+
+    if (!confirm(`Process ${approvedListings.length} approved listings with Jina AI and OpenAI? This will create events from the approved listings.`)) {
+      return;
+    }
+
+    setProcessingApproved(true);
+    setError('');
+    console.log('Starting approved listings processing...');
+
+    try {
+      const listingIds = approvedListings.map(l => l.id);
+
+      const response = await fetch('/api/process-approved', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({ listingIds }),
+        signal: AbortSignal.timeout(300000) // 5 minute timeout
+      });
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || `Processing failed (${response.status})`);
+      }
+
+      const result = await response.json();
+      console.log('Processing result:', result);
+
+      if (result.errors && result.errors.length > 0) {
+        console.warn('Some listings failed to process:', result.errors);
+        setError(`Processed ${result.processed}/${result.total} listings. ${result.errors.length} failed.`);
+      } else {
+        setError(''); // Clear any previous errors
+      }
+
+      // Refresh data
+      await Promise.all([
+        fetchScrapedListings(),
+        fetchEvents()
+      ]);
+
+      console.log(`Successfully processed ${result.processed} listings into events`);
+      
+    } catch (err: any) {
+      console.error('Processing error:', err);
+      if (err.name === 'AbortError') {
+        setError('Processing timed out. Some events may have been created.');
+      } else {
+        setError(err.message || 'Failed to process approved listings');
+      }
+    } finally {
+      setProcessingApproved(false);
+    }
+  };
+
   if (authLoading || pageLoading) {
     return (
       <div className="flex flex-col justify-center items-center min-h-screen">
@@ -658,9 +726,30 @@ export default function AdminDashboard() {
             <div className="space-y-4">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-medium">Scraped Listings</h3>
-                <span className="text-sm text-gray-500">
-                  {displayedListings.length} displayed, {displayedListings.filter(l => l.status === 'pending').length} pending
-                </span>
+                <div className="flex items-center gap-4">
+                  <span className="text-sm text-gray-500">
+                    {displayedListings.length} displayed, {displayedListings.filter(l => l.status === 'pending').length} pending, {scrapedListings.filter(l => l.status === 'approved').length} approved
+                  </span>
+                  {scrapedListings.filter(l => l.status === 'approved').length > 0 && (
+                    <button
+                      onClick={handleProcessApprovedListings}
+                      disabled={processingApproved || !isOnline}
+                      className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium flex items-center"
+                    >
+                      {processingApproved ? (
+                        <>
+                          <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          Processing...
+                        </>
+                      ) : (
+                        `Process ${scrapedListings.filter(l => l.status === 'approved').length} Approved`
+                      )}
+                    </button>
+                  )}
+                </div>
               </div>
 
               {displayedListings.map(listing => (
@@ -685,7 +774,9 @@ export default function AdminDashboard() {
                           <span className={`inline-block px-2 py-1 rounded text-xs font-medium mr-2 ${
                             listing.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
                             listing.status === 'approved' ? 'bg-green-100 text-green-800' :
-                            'bg-red-100 text-red-800'
+                            listing.status === 'processed' ? 'bg-blue-100 text-blue-800' :
+                            listing.status === 'error' ? 'bg-red-100 text-red-800' :
+                            'bg-gray-100 text-gray-800'
                           }`}>
                             {listing.status}
                           </span>
@@ -711,8 +802,18 @@ export default function AdminDashboard() {
                             disabled={!isOnline}
                             className="flex-1 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-lg transition-colors disabled:opacity-50"
                           >
-                            Approve for Scraping
+                            Approve for Processing
                           </button>
+                        </div>
+                      )}
+                      {listing.status === 'processed' && (
+                        <div className="mt-4">
+                          <p className="text-sm text-blue-600 font-medium">✓ Successfully processed into event</p>
+                        </div>
+                      )}
+                      {listing.status === 'error' && (
+                        <div className="mt-4">
+                          <p className="text-sm text-red-600 font-medium">⚠ Failed to process - check logs</p>
                         </div>
                       )}
                     </div>
@@ -757,7 +858,7 @@ export default function AdminDashboard() {
                     </h3>
                     <div className="flex-grow">
                       <p className="text-sm text-gray-600 mb-2">
-                        Date: {new Date(event.date).toLocaleDateString()}
+                        Date: {event.start_date ? new Date(event.start_date).toLocaleDateString() : 'No date specified'}
                       </p>
                       <p className="text-sm text-gray-600 mb-2">
                         Location: {event.location}
@@ -834,7 +935,7 @@ export default function AdminDashboard() {
                     </h3>
                     <div className="flex-grow">
                       <p className="text-sm text-gray-600 mb-2">
-                        Date: {new Date(event.date).toLocaleDateString()}
+                        Date: {event.start_date ? new Date(event.start_date).toLocaleDateString() : 'No date specified'}
                       </p>
                       <p className="text-sm text-gray-600 mb-2">
                         Location: {event.location}
