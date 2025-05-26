@@ -96,10 +96,14 @@ export default function AdminDashboard() {
   const [isOnline, setIsOnline] = useState(true);
   const [recoveringData, setRecoveringData] = useState(false);
   const [processingApproved, setProcessingApproved] = useState(false);
+  const [expandedEventId, setExpandedEventId] = useState<string | null>(null);
+  const [showReadyDropdown, setShowReadyDropdown] = useState(false);
+  const [processingIndividual, setProcessingIndividual] = useState<string | null>(null);
   
   // Use refs to prevent multiple simultaneous operations
   const fetchingRef = useRef(false);
   const supabaseManager = SupabaseManager.getInstance();
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Browser storage keys
   const SCRAPED_DATA_KEY = 'pending_scraped_data';
@@ -118,6 +122,23 @@ export default function AdminDashboard() {
       window.removeEventListener('offline', handleOffline);
     };
   }, []);
+
+  // Handle click outside dropdown to close it
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setShowReadyDropdown(false);
+      }
+    };
+
+    if (showReadyDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showReadyDropdown]);
 
   // Fetch events from DB
   const fetchEvents = useCallback(async () => {
@@ -521,18 +542,14 @@ export default function AdminDashboard() {
     }
   };
 
-  // Handle processing approved listings with Jina AI and OpenAI
+  // Handle processing approved and error listings with Jina AI and OpenAI
   const handleProcessApprovedListings = async () => {
     if (processingApproved || !isOnline) return;
 
-    const approvedListings = scrapedListings.filter(l => l.status === 'approved');
+    const readyListings = scrapedListings.filter(l => l.status === 'approved' || l.status === 'error');
     
-    if (approvedListings.length === 0) {
-      setError('No approved listings to process');
-      return;
-    }
-
-    if (!confirm(`Process ${approvedListings.length} approved listings with Jina AI and OpenAI? This will create events from the approved listings.`)) {
+    if (readyListings.length === 0) {
+      setError('No listings ready to process');
       return;
     }
 
@@ -541,7 +558,7 @@ export default function AdminDashboard() {
     console.log('Starting approved listings processing...');
 
     try {
-      const listingIds = approvedListings.map(l => l.id);
+      const listingIds = readyListings.map((l: ScrapedEventListing) => l.id);
 
       const response = await fetch('/api/process-approved', {
         method: 'POST',
@@ -585,6 +602,86 @@ export default function AdminDashboard() {
       }
     } finally {
       setProcessingApproved(false);
+    }
+  };
+
+  // Handle individual listing processing
+  const handleProcessIndividualListing = async (listingId: string) => {
+    if (processingIndividual || !isOnline) return;
+
+    setProcessingIndividual(listingId);
+    setError('');
+
+    try {
+      const response = await fetch('/api/process-approved', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({ listingIds: [listingId] }),
+        signal: AbortSignal.timeout(300000) // 5 minute timeout
+      });
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || `Processing failed (${response.status})`);
+      }
+
+      const result = await response.json();
+      console.log('Individual processing result:', result);
+
+      if (result.errors && result.errors.length > 0) {
+        setError(`Processing failed: ${result.errors[0].error}`);
+      } else {
+        setError(''); // Clear any previous errors
+      }
+
+      // Refresh data
+      await Promise.all([
+        fetchScrapedListings(),
+        fetchEvents()
+      ]);
+
+    } catch (err: any) {
+      console.error('Individual processing error:', err);
+      setError(err.message || 'Failed to process listing');
+    } finally {
+      setProcessingIndividual(null);
+    }
+  };
+
+  // Handle resetting listing status to pending
+  const handleResetListingStatus = async (listingId: string) => {
+    try {
+      await supabaseManager.executeQuery(
+        async () => {
+          const result = await supabase
+            .from('scraped_listings')
+            .update({ status: 'pending' })
+            .eq('id', listingId);
+          return result;
+        },
+        'resetListingStatus'
+      );
+
+      // Update local state optimistically
+      setScrapedListings(prevListings =>
+        prevListings.map(l =>
+          l.id === listingId ? { ...l, status: 'pending' } : l
+        )
+      );
+      
+      // Update displayed listings
+      setDisplayedListings(prevDisplayed =>
+        prevDisplayed.map(l =>
+          l.id === listingId ? { ...l, status: 'pending' } : l
+        )
+      );
+      
+    } catch (err: any) {
+      console.error('Error resetting listing status:', err);
+      setError(`Failed to reset listing status: ${err.message}`);
     }
   };
 
@@ -728,26 +825,102 @@ export default function AdminDashboard() {
                 <h3 className="text-lg font-medium">Scraped Listings</h3>
                 <div className="flex items-center gap-4">
                   <span className="text-sm text-gray-500">
-                    {displayedListings.length} displayed, {displayedListings.filter(l => l.status === 'pending').length} pending, {scrapedListings.filter(l => l.status === 'approved').length} approved
+                    {displayedListings.length} displayed, {displayedListings.filter(l => l.status === 'pending').length} pending, {scrapedListings.filter(l => l.status === 'approved').length} approved, {scrapedListings.filter(l => l.status === 'error').length} failed
                   </span>
-                  {scrapedListings.filter(l => l.status === 'approved').length > 0 && (
-                    <button
-                      onClick={handleProcessApprovedListings}
-                      disabled={processingApproved || !isOnline}
-                      className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium flex items-center"
-                    >
-                      {processingApproved ? (
-                        <>
-                          <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  {(scrapedListings.filter(l => l.status === 'approved').length > 0 || scrapedListings.filter(l => l.status === 'error').length > 0) && (
+                    <div className="relative" ref={dropdownRef}>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={handleProcessApprovedListings}
+                          disabled={processingApproved || !isOnline}
+                          className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium flex items-center"
+                        >
+                          {processingApproved ? (
+                            <>
+                              <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                              </svg>
+                              Processing...
+                            </>
+                          ) : (
+                            `Process ${scrapedListings.filter(l => l.status === 'approved' || l.status === 'error').length} Listings`
+                          )}
+                        </button>
+                        <button
+                          onClick={() => setShowReadyDropdown(!showReadyDropdown)}
+                          className="px-2 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-sm font-medium"
+                          title="View ready listings"
+                        >
+                          <svg className={`w-4 h-4 transition-transform ${showReadyDropdown ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                           </svg>
-                          Processing...
-                        </>
-                      ) : (
-                        `Process ${scrapedListings.filter(l => l.status === 'approved').length} Approved`
+                        </button>
+                      </div>
+                      
+                      {showReadyDropdown && (
+                        <div className="absolute top-full right-0 mt-2 w-96 bg-white border border-gray-200 rounded-lg shadow-lg z-10 max-h-80 overflow-y-auto">
+                          <div className="p-3 border-b bg-gray-50">
+                            <h4 className="font-medium text-gray-900">Ready Listings ({scrapedListings.filter(l => l.status === 'approved' || l.status === 'error').length})</h4>
+                          </div>
+                          <div className="max-h-64 overflow-y-auto">
+                            {scrapedListings.filter(l => l.status === 'approved' || l.status === 'error').map(listing => (
+                              <div key={listing.id} className="p-3 border-b border-gray-100 last:border-b-0">
+                                <div className="flex items-center justify-between gap-3 h-16">
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2 mb-1">
+                                      <span className={`inline-block px-2 py-1 rounded text-xs font-medium ${
+                                        listing.status === 'approved' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                                      }`}>
+                                        {listing.status}
+                                      </span>
+                                    </div>
+                                    <p className="text-sm font-medium text-gray-900 truncate" title={listing.title}>
+                                      {listing.title}
+                                    </p>
+                                    {listing.status === 'error' && (
+                                      <p className="text-xs text-red-600 truncate" title="Processing failed">
+                                        Error: Processing failed
+                                      </p>
+                                    )}
+                                  </div>
+                                  <div className="flex gap-1 flex-shrink-0">
+                                    <button
+                                      onClick={() => handleResetListingStatus(listing.id)}
+                                      disabled={!isOnline}
+                                      className="px-2 py-1 text-xs bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors disabled:opacity-50"
+                                      title="Reset to pending"
+                                    >
+                                      Remove
+                                    </button>
+                                    <button
+                                      onClick={() => handleProcessIndividualListing(listing.id)}
+                                      disabled={processingIndividual === listing.id || !isOnline}
+                                      className="px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors disabled:opacity-50 flex items-center"
+                                      title="Process this listing"
+                                    >
+                                      {processingIndividual === listing.id ? (
+                                        <svg className="animate-spin h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                        </svg>
+                                      ) : (
+                                        'Process'
+                                      )}
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                            {scrapedListings.filter(l => l.status === 'approved' || l.status === 'error').length === 0 && (
+                              <div className="p-4 text-center text-gray-500 text-sm">
+                                No ready listings
+                              </div>
+                            )}
+                          </div>
+                        </div>
                       )}
-                    </button>
+                    </div>
                   )}
                 </div>
               </div>
@@ -788,32 +961,34 @@ export default function AdminDashboard() {
                           Added: {new Date(listing.created_at).toLocaleDateString()}
                         </p>
                       </div>
-                      {listing.status === 'pending' && (
-                        <div className="flex gap-2 mt-4">
-                          <button 
-                            onClick={() => handleRejectListing(listing.id)}
-                            disabled={!isOnline}
-                            className="flex-1 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors disabled:opacity-50"
-                          >
-                            Reject
-                          </button>
-                          <button 
-                            onClick={() => handleApproveForScraping(listing.id)}
-                            disabled={!isOnline}
-                            className="flex-1 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-lg transition-colors disabled:opacity-50"
-                          >
-                            Approve for Processing
-                          </button>
+                      {(listing.status === 'pending' || listing.status === 'error') && (
+                        <div className="mt-4">
+                          {listing.status === 'error' && (
+                            <div className="mb-3">
+                              <p className="text-sm text-red-600 font-medium">⚠ Previous processing failed - you can retry below</p>
+                            </div>
+                          )}
+                          <div className="flex gap-2">
+                            <button 
+                              onClick={() => handleRejectListing(listing.id)}
+                              disabled={!isOnline}
+                              className="flex-1 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors disabled:opacity-50"
+                            >
+                              Reject
+                            </button>
+                            <button 
+                              onClick={() => handleApproveForScraping(listing.id)}
+                              disabled={!isOnline}
+                              className="flex-1 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-lg transition-colors disabled:opacity-50"
+                            >
+                              {listing.status === 'error' ? 'Retry Processing' : 'Approve for Processing'}
+                            </button>
+                          </div>
                         </div>
                       )}
                       {listing.status === 'processed' && (
                         <div className="mt-4">
                           <p className="text-sm text-blue-600 font-medium">✓ Successfully processed into event</p>
-                        </div>
-                      )}
-                      {listing.status === 'error' && (
-                        <div className="mt-4">
-                          <p className="text-sm text-red-600 font-medium">⚠ Failed to process - check logs</p>
                         </div>
                       )}
                     </div>
@@ -839,65 +1014,237 @@ export default function AdminDashboard() {
               </span>
             </div>
 
-            {events.filter(e => e.status === 'pending').map(event => (
-              <div key={event.id} className="bg-white p-4 rounded-lg shadow border">
-                <div className="flex gap-4">
-                  <div className="w-1/3 h-48 relative">
-                    <img 
-                      src={event.images?.[0] || '/placeholder-event.jpg'} 
-                      alt={event.name} 
-                      className="w-full h-full object-cover rounded-lg" 
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).src = '/placeholder-event.jpg';
-                      }}
-                    />
-                  </div>
-                  <div className="w-2/3 flex flex-col">
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">
-                      {event.name}
-                    </h3>
-                    <div className="flex-grow">
-                      <p className="text-sm text-gray-600 mb-2">
-                        Date: {event.start_date ? new Date(event.start_date).toLocaleDateString() : 'No date specified'}
-                      </p>
-                      <p className="text-sm text-gray-600 mb-2">
-                        Location: {event.location}
-                      </p>
-                      <p className="text-sm text-gray-600 mb-4 line-clamp-3">
-                        {event.description}
-                      </p>
-                      <p className="text-sm text-gray-600">
-                        Category: {event.categories?.name || 'Uncategorized'}
-                      </p>
+            {events.filter(e => e.status === 'pending').map(event => {
+              const isExpanded = expandedEventId === event.id;
+              
+              return (
+                <div key={event.id} className="bg-white rounded-lg shadow border overflow-hidden">
+                  {/* Main Event Card */}
+                  <div className="p-4">
+                    <div className="flex gap-4">
+                      <div className="w-1/3 h-48 relative">
+                        <img 
+                          src={event.images?.[0] || '/placeholder-event.jpg'} 
+                          alt={event.name} 
+                          className="w-full h-full object-cover rounded-lg" 
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = '/placeholder-event.jpg';
+                          }}
+                        />
+                      </div>
+                      <div className="w-2/3 flex flex-col">
+                        <div className="flex items-start justify-between mb-2">
+                          <h3 className="text-lg font-medium text-gray-900 flex-1 pr-4">
+                            {event.name}
+                          </h3>
+                          <button
+                            onClick={() => setExpandedEventId(isExpanded ? null : event.id)}
+                            className="flex-shrink-0 p-1 text-gray-400 hover:text-gray-600 transition-colors"
+                            title={isExpanded ? "Hide details" : "Show details"}
+                          >
+                            <svg 
+                              className={`w-5 h-5 transition-transform ${isExpanded ? 'rotate-180' : ''}`} 
+                              fill="none" 
+                              stroke="currentColor" 
+                              viewBox="0 0 24 24"
+                            >
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
+                          </button>
+                        </div>
+                        <div className="flex-grow">
+                          <p className="text-sm text-gray-600 mb-2">
+                            <span className="font-medium">Date:</span> {event.start_date ? new Date(event.start_date).toLocaleDateString() : 'No date specified'}
+                          </p>
+                          <p className="text-sm text-gray-600 mb-2">
+                            <span className="font-medium">Location:</span> {event.location}
+                          </p>
+                          <p className="text-sm text-gray-600 mb-4 line-clamp-2">
+                            <span className="font-medium">Description:</span> {event.description || 'No description available'}
+                          </p>
+                          <p className="text-sm text-gray-600">
+                            <span className="font-medium">Category:</span> {event.categories?.name || 'Uncategorized'}
+                          </p>
+                        </div>
+                        <div className="flex gap-2 mt-4">
+                          <button
+                            onClick={() => setExpandedEventId(isExpanded ? null : event.id)}
+                            className="flex-1 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                          >
+                            {isExpanded ? 'Hide Details' : 'View Details'}
+                          </button>
+                          <a 
+                            href={event.url} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="flex-1 py-2 text-sm font-medium text-center text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+                          >
+                            View Source
+                          </a>
+                          <button 
+                            onClick={() => handleDeleteEvent(event.id)}
+                            disabled={!isOnline}
+                            className="flex-1 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors disabled:opacity-50"
+                          >
+                            Delete
+                          </button>
+                          <button 
+                            onClick={() => handleUpdateEventStatus(event.id, 'approved')}
+                            disabled={!isOnline}
+                            className="flex-1 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-lg transition-colors disabled:opacity-50"
+                          >
+                            Approve
+                          </button>
+                        </div>
+                      </div>
                     </div>
-                    <div className="flex gap-2 mt-4">
-                      <a 
-                        href={event.url} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="flex-1 py-2 text-sm font-medium text-center text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
-                      >
-                        View Source
-                      </a>
-                      <button 
-                        onClick={() => handleUpdateEventStatus(event.id, 'approved')}
-                        disabled={!isOnline}
-                        className="flex-1 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-lg transition-colors disabled:opacity-50"
-                      >
-                        Approve
-                      </button>
-                      <button 
-                        onClick={() => handleDeleteEvent(event.id)}
-                        disabled={!isOnline}
-                        className="flex-1 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors disabled:opacity-50"
-                      >
-                        Delete
-                      </button>
-                    </div>
                   </div>
+
+                  {/* Expanded Details Section */}
+                  {isExpanded && (
+                    <div className="border-t bg-gray-50 p-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {/* Left Column - Event Details */}
+                        <div className="space-y-4">
+                          <h4 className="text-md font-semibold text-gray-900 border-b pb-2">Event Information</h4>
+                          
+                          <div className="space-y-3">
+                            <div>
+                              <label className="text-sm font-medium text-gray-700">Event Name:</label>
+                              <p className="text-sm text-gray-900 mt-1">{event.name}</p>
+                            </div>
+                            
+                            <div>
+                              <label className="text-sm font-medium text-gray-700">Full Description:</label>
+                              <p className="text-sm text-gray-900 mt-1 whitespace-pre-wrap">
+                                {event.description || 'No description available'}
+                              </p>
+                            </div>
+                            
+                            <div>
+                              <label className="text-sm font-medium text-gray-700">Location:</label>
+                              <p className="text-sm text-gray-900 mt-1">{event.location}</p>
+                            </div>
+                            
+                            {event.coordinates && (
+                              <div>
+                                <label className="text-sm font-medium text-gray-700">Coordinates:</label>
+                                <p className="text-sm text-gray-900 mt-1 font-mono">{event.coordinates}</p>
+                              </div>
+                            )}
+                            
+                            <div>
+                              <label className="text-sm font-medium text-gray-700">Category:</label>
+                              <p className="text-sm text-gray-900 mt-1">{event.categories?.name || 'Uncategorized'}</p>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Right Column - Metadata & Images */}
+                        <div className="space-y-4">
+                          <h4 className="text-md font-semibold text-gray-900 border-b pb-2">Metadata</h4>
+                          
+                          <div className="space-y-3">
+                            <div>
+                              <label className="text-sm font-medium text-gray-700">Event ID:</label>
+                              <p className="text-sm text-gray-900 mt-1 font-mono break-all">{event.id}</p>
+                            </div>
+                            
+                            <div>
+                              <label className="text-sm font-medium text-gray-700">Start Date:</label>
+                              <p className="text-sm text-gray-900 mt-1">
+                                {event.start_date ? (
+                                  <>
+                                    {new Date(event.start_date).toLocaleDateString()} at {new Date(event.start_date).toLocaleTimeString()}
+                                    <br />
+                                    <span className="text-xs text-gray-500">({event.start_date})</span>
+                                  </>
+                                ) : (
+                                  'No date specified'
+                                )}
+                              </p>
+                            </div>
+                            
+                            <div>
+                              <label className="text-sm font-medium text-gray-700">End Date:</label>
+                              <p className="text-sm text-gray-900 mt-1">
+                                {event.end_date ? (
+                                  <>
+                                    {new Date(event.end_date).toLocaleDateString()} at {new Date(event.end_date).toLocaleTimeString()}
+                                    <br />
+                                    <span className="text-xs text-gray-500">({event.end_date})</span>
+                                  </>
+                                ) : (
+                                  'No end date specified'
+                                )}
+                              </p>
+                            </div>
+                            
+                            <div>
+                              <label className="text-sm font-medium text-gray-700">Source URL:</label>
+                              <a 
+                                href={event.url} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="text-sm text-blue-600 hover:underline mt-1 block break-all"
+                              >
+                                {event.url}
+                              </a>
+                            </div>
+                            
+                            <div>
+                              <label className="text-sm font-medium text-gray-700">Created:</label>
+                              <p className="text-sm text-gray-900 mt-1">
+                                {new Date(event.created_at).toLocaleDateString()} at {new Date(event.created_at).toLocaleTimeString()}
+                              </p>
+                            </div>
+                            
+                            <div>
+                              <label className="text-sm font-medium text-gray-700">Last Updated:</label>
+                              <p className="text-sm text-gray-900 mt-1">
+                                {new Date(event.updated_at).toLocaleDateString()} at {new Date(event.updated_at).toLocaleTimeString()}
+                              </p>
+                            </div>
+                          </div>
+                          
+                          {/* Images Section */}
+                          {event.images && event.images.length > 0 && (
+                            <div>
+                              <label className="text-sm font-medium text-gray-700">Images ({event.images.length}):</label>
+                              <div className="mt-2 grid grid-cols-2 gap-2">
+                                {event.images.map((imageUrl, index) => (
+                                  <div key={index} className="relative">
+                                    <img 
+                                      src={imageUrl} 
+                                      alt={`Event image ${index + 1}`}
+                                      className="w-full h-24 object-cover rounded border"
+                                      onError={(e) => {
+                                        (e.target as HTMLImageElement).src = '/placeholder-event.jpg';
+                                      }}
+                                    />
+                                    <a 
+                                      href={imageUrl} 
+                                      target="_blank" 
+                                      rel="noopener noreferrer"
+                                      className="absolute inset-0 bg-black bg-opacity-0 hover:bg-opacity-20 transition-all duration-200 flex items-center justify-center"
+                                      title="View full image"
+                                    >
+                                      <svg className="w-6 h-6 text-white opacity-0 hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                      </svg>
+                                    </a>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
 
             {events.filter(e => e.status === 'pending').length === 0 && (
               <div className="text-center py-8 text-gray-500">

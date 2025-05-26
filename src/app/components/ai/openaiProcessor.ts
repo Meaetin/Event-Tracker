@@ -5,10 +5,10 @@ interface ProcessedEventData {
   date: string | null; // ISO timestamp or null if not found
   location: string;
   description: string;
-  category: string;
+  category_id: number;
   coordinates?: {
-    x: number; // longitude
     y: number; // latitude
+    x: number; // longitude
   };
 }
 
@@ -40,15 +40,30 @@ Your task is to analyze the provided markdown content and extract the following 
 - Event date and time (required if available)
 - Location/venue (required, include full address if available)
 - Description (required, short description of the event in 1-2 sentences)
-- Category (required, choose from: "Arts and Culture", "Food and Drinks", "Sports and Fitness", "Music and Concerts", "Festivals and Markets", "Nature and Park', "Family and kids", "Entertainment", "Technology", "Education", "Others")
+- Category ID (required, choose the appropriate number from the categories below)
+
+Available categories:
+1: "Arts & Culture"
+2: "Food & Drinks" 
+3: "Sports & Fitness"
+4: "Music & Concerts"
+5: "Festivals & Markets"
+6: "Nature & Parks"
+7: "Family & Kids"
+8: "Technology"
+9: "Education"
+10: "Others"
+11: "Entertainment"
+13: "Attractions"
 
 Important guidelines:
-- If the date is relative (like "this weekend", "next Friday"), try to infer the actual date based on context
+- All dates should be processed based on Singapore timezone (SGT/UTC+8)
+- If the date is relative (like "this weekend", "next Friday"), try to infer the actual date based on current Singapore time
 - If they state duration of date (like "from now till 31 Aug"), state the date to be "Now - 'End date' "
 - If no specific date is found, return null for the date
 - For location, include the full address if available, otherwise just the venue name and city
 - Keep descriptions concise but informative
-- Choose the most appropriate category from the predefined list
+- Choose the most appropriate category ID number from the list above
 
 Return the information as a JSON object with the following structure:
 {
@@ -56,7 +71,7 @@ Return the information as a JSON object with the following structure:
   "date": "24 May 2025 - 31 Aug 2025" OR "24 May 2025" OR "Every Friday" OR "null",
   "location": "Venue Name, Address, City",
   "description": "Brief description of the event",
-  "category": "Category Name"
+  "category_id": 4
 }
 
 If you cannot extract the required information, return an error object:
@@ -64,8 +79,20 @@ If you cannot extract the required information, return an error object:
   "error": "Reason why the event information could not be extracted"
 }`;
 
+      // Get current Singapore time for context
+      const singaporeTime = new Date().toLocaleString('en-SG', { 
+        timeZone: 'Asia/Singapore',
+        year: 'numeric',
+        month: 'long', 
+        day: 'numeric',
+        weekday: 'long',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+
       const userPrompt = `Please extract event information from this markdown content:
 
+Current Singapore time: ${singaporeTime}
 Source URL: ${sourceUrl}
 
 Markdown Content:
@@ -94,7 +121,7 @@ ${markdown}`;
       }
 
       // Validate required fields (date is optional)
-      const requiredFields = ['name', 'location', 'description', 'category'];
+      const requiredFields = ['name', 'location', 'description', 'category_id'];
       for (const field of requiredFields) {
         if (!parsedResponse[field]) {
           throw new Error(`Missing required field: ${field}`);
@@ -121,7 +148,7 @@ ${markdown}`;
         date: processedDate,
         location: parsedResponse.location.trim(),
         description: parsedResponse.description.trim(),
-        category: parsedResponse.category.trim(),
+        category_id: parsedResponse.category_id,
         coordinates
       };
 

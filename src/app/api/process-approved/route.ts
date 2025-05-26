@@ -17,6 +17,88 @@ const supabase = createClient(
 
 export const maxDuration = 300; // 5 minutes for processing multiple events
 
+// Helper function to parse flexible date strings into simple date strings
+function parseDateString(dateStr: string | null): { startDate: string | null; endDate: string | null } {
+  if (!dateStr || dateStr === 'null') {
+    return { startDate: null, endDate: null };
+  }
+
+  try {
+    // Handle date ranges like "23 May 2025 - 28 Sep 2025"
+    if (dateStr.includes(' - ')) {
+      const [startPart, endPart] = dateStr.split(' - ').map(s => s.trim());
+      
+      // Keep as formatted date strings
+      const startDate = formatDateString(startPart);
+      const endDate = formatDateString(endPart);
+      
+      return { 
+        startDate: startDate, 
+        endDate: endDate 
+      };
+    }
+    
+    // Handle single dates like "24 May 2025"
+    const singleDate = formatDateString(dateStr);
+    return { 
+      startDate: singleDate, 
+      endDate: null 
+    };
+    
+  } catch (error) {
+    console.warn(`Could not parse date string: "${dateStr}"`, error);
+    return { startDate: null, endDate: null };
+  }
+}
+
+// Helper function to format date strings consistently
+function formatDateString(dateStr: string): string | null {
+  if (!dateStr || dateStr.trim() === '') {
+    return null;
+  }
+
+  // Handle special cases
+  if (dateStr.toLowerCase().includes('now')) {
+    const now = new Date();
+    return now.toLocaleDateString('en-GB', { 
+      day: 'numeric', 
+      month: 'short', 
+      year: 'numeric' 
+    });
+  }
+  
+  if (dateStr.toLowerCase().includes('every') || dateStr.toLowerCase().includes('ongoing')) {
+    // For recurring events, return the original string
+    return dateStr;
+  }
+
+  try {
+    // Try to parse the date to validate it
+    const parsed = new Date(dateStr);
+    
+    // Check if the parsed date is valid
+    if (isNaN(parsed.getTime())) {
+      return dateStr; // Return original if can't parse
+    }
+    
+    // Check if the year is reasonable (between 2020 and 2030)
+    const year = parsed.getFullYear();
+    if (year < 2020 || year > 2030) {
+      return dateStr; // Return original if year is unreasonable
+    }
+    
+    // Return a consistent format: "24 May 2025"
+    return parsed.toLocaleDateString('en-GB', { 
+      day: 'numeric', 
+      month: 'short', 
+      year: 'numeric' 
+    });
+  } catch (error) {
+    // If parsing fails, return the original string
+    return dateStr;
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const { listingIds } = await req.json();
@@ -25,24 +107,26 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No listing IDs provided' }, { status: 400 });
     }
 
-    console.log('Processing approved listings:', listingIds);
+    console.log('Processing ready listings:', listingIds);
 
-    // Get approved scraped listings
+    // Get approved and error scraped listings (for retry)
     const { data: listings, error: fetchError } = await supabase
       .from('scraped_listings')
       .select('*')
       .in('id', listingIds)
-      .eq('status', 'approved');
+      .in('status', ['approved', 'error']);
 
     if (fetchError) {
       throw new Error(`Failed to fetch listings: ${fetchError.message}`);
     }
 
     if (!listings || listings.length === 0) {
-      return NextResponse.json({ error: 'No approved listings found' }, { status: 404 });
+      return NextResponse.json({ error: 'No ready listings found' }, { status: 404 });
     }
 
-    console.log(`Found ${listings.length} approved listings to process`);
+    const approvedCount = listings.filter(l => l.status === 'approved').length;
+    const errorCount = listings.filter(l => l.status === 'error').length;
+    console.log(`Found ${listings.length} ready listings to process (${approvedCount} approved, ${errorCount} retry)`);
 
     // Initialize services
     const jinaScraper = new JinaScraper();
@@ -66,41 +150,24 @@ export async function POST(req: NextRequest) {
           listing.url
         );
         console.log(`Processed event data for ${listing.url}:`, eventData.name);
+        console.log('eventData:', eventData);
 
-        // Step 3: Get or create category
-        let categoryId = null;
-        if (eventData.category) {
-          const { data: existingCategory } = await supabase
-            .from('categories')
-            .select('id')
-            .eq('name', eventData.category)
-            .single();
-
-          if (existingCategory) {
-            categoryId = existingCategory.id;
-          } else {
-            // Create new category
-            const { data: newCategory, error: categoryError } = await supabase
-              .from('categories')
-              .insert({ name: eventData.category })
-              .select('id')
-              .single();
-
-            if (!categoryError && newCategory) {
-              categoryId = newCategory.id;
-            }
-          }
-        }
+        // Step 3: Use category_id directly from AI response
+        const categoryId = eventData.category_id;
 
         // Step 4: Create event in database
         // Use the existing image from the listing instead of extracting from markdown
         const eventImages = listing.image_url ? [listing.image_url] : (scrapedContent.images || []);
         
+        // Parse the flexible date format into start_date and end_date
+        const { startDate, endDate } = parseDateString(eventData.date);
+        console.log(`Date parsing: "${eventData.date}" -> start: ${startDate}, end: ${endDate}`);
+        
         const eventToInsert = {
           name: eventData.name,
           url: listing.url,
-          start_date: eventData.date || null, // Use the extracted date as start_date
-          end_date: null, // Set end_date to null since we only extract one date
+          start_date: startDate,
+          end_date: endDate,
           location: eventData.location,
           coordinates: eventData.coordinates ? `(${eventData.coordinates.x},${eventData.coordinates.y})` : null,
           description: eventData.description,
