@@ -3,8 +3,8 @@
 import dynamic from 'next/dynamic';
 
 // Only runs on the client
-const MyMap = dynamic(() => import('./myMap'), { ssr: false });
+const EventsMap = dynamic(() => import('./EventsMap'), { ssr: false });
 
-export default function mapClientWrapper() {
-  return <MyMap />;
+export default function MapClientWrapper() {
+  return <EventsMap />;
 }

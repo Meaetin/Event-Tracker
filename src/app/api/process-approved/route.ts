@@ -60,42 +60,58 @@ function formatDateString(dateStr: string): string | null {
   // Handle special cases
   if (dateStr.toLowerCase().includes('now')) {
     const now = new Date();
-    return now.toLocaleDateString('en-GB', { 
-      day: 'numeric', 
-      month: 'short', 
-      year: 'numeric' 
-    });
+    return now.toISOString().split('T')[0]; // Return YYYY-MM-DD format
   }
   
   if (dateStr.toLowerCase().includes('every') || dateStr.toLowerCase().includes('ongoing')) {
-    // For recurring events, return the original string
-    return dateStr;
+    // For recurring events, return null since they don't have specific dates
+    return null;
   }
 
   try {
-    // Try to parse the date to validate it
-    const parsed = new Date(dateStr);
+    // Handle dates without year (like "22 May") by adding current year or next year
+    let dateToProcess = dateStr.trim();
+    
+    // Check if the date string doesn't contain a year (no 4-digit number)
+    if (!/\b\d{4}\b/.test(dateToProcess)) {
+      const currentYear = new Date().getFullYear();
+      const currentMonth = new Date().getMonth();
+      
+      // Add current year to the date
+      dateToProcess = `${dateToProcess} ${currentYear}`;
+      
+      // Try to parse with current year - use local timezone parsing
+      const testDate = new Date(dateToProcess + ' 12:00:00'); // Add midday to avoid timezone issues
+      
+      // If the date is in the past (more than 1 month ago), use next year instead
+      if (testDate.getTime() < Date.now() - (30 * 24 * 60 * 60 * 1000)) {
+        dateToProcess = `${dateStr.trim()} ${currentYear + 1}`;
+      }
+    }
+    
+    // Parse the date with explicit midday time to avoid timezone shifting
+    const dateWithTime = dateToProcess.includes(':') ? dateToProcess : `${dateToProcess} 12:00:00`;
+    const parsed = new Date(dateWithTime);
     
     // Check if the parsed date is valid
     if (isNaN(parsed.getTime())) {
-      return dateStr; // Return original if can't parse
+      console.warn(`Could not parse date: "${dateStr}" -> "${dateToProcess}"`);
+      return null; // Return null if can't parse instead of original string
     }
     
     // Check if the year is reasonable (between 2020 and 2030)
     const year = parsed.getFullYear();
     if (year < 2020 || year > 2030) {
-      return dateStr; // Return original if year is unreasonable
+      console.warn(`Date year out of range: "${dateStr}" -> ${year}`);
+      return null;
     }
     
-    // Return a consistent format: "24 May 2025"
-    return parsed.toLocaleDateString('en-GB', { 
-      day: 'numeric', 
-      month: 'short', 
-      year: 'numeric' 
-    });
+    // Return in YYYY-MM-DD format for database
+    return parsed.toISOString().split('T')[0];
+    
   } catch (error) {
-    // If parsing fails, return the original string
-    return dateStr;
+    console.warn(`Error parsing date "${dateStr}":`, error);
+    return null;
   }
 }
 
@@ -168,6 +184,7 @@ export async function POST(req: NextRequest) {
           url: listing.url,
           start_date: startDate,
           end_date: endDate,
+          time: eventData.time,
           location: eventData.location,
           coordinates: eventData.coordinates ? `(${eventData.coordinates.x},${eventData.coordinates.y})` : null,
           description: eventData.description,

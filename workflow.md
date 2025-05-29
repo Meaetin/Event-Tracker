@@ -34,6 +34,7 @@ A web application that scrapes event information, processes it through AI, and d
      - Location
      - Images
      - URL to event page
+     - Description
 
 5. **Event Sidebar**
    - Lists all active events

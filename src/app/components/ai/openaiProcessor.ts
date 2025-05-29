@@ -2,7 +2,8 @@ import OpenAI from 'openai';
 
 interface ProcessedEventData {
   name: string;
-  date: string | null; // ISO timestamp or null if not found
+  date: string | null; // Date only (e.g., "22 May 2025" or "22 May - 15 Jun 2025")
+  time: string | null; // Time only (e.g., "9:00 am - 9:00 pm")
   location: string;
   description: string;
   category_id: number;
@@ -34,10 +35,11 @@ export class OpenAIProcessor {
   async processEventMarkdown(markdown: string, sourceUrl: string): Promise<ProcessedEventData> {
     try {
       const systemPrompt = `You are an AI assistant that extracts event information from markdown content. 
-      
+
 Your task is to analyze the provided markdown content and extract the following information:
 - Event name (required)
-- Event date and time (required if available)
+- Event date (required if available) - DATE ONLY, no time
+- Event time (optional) - TIME ONLY, no date
 - Location/venue (required, include full address if available)
 - Description (required, short description of the event in 1-2 sentences)
 - Category ID (required, choose the appropriate number from the categories below)
@@ -56,11 +58,31 @@ Available categories:
 11: "Entertainment"
 13: "Attractions"
 
-Important guidelines:
+IMPORTANT TIMING EXTRACTION GUIDELINES:
+- Look specifically for timing information that appears ABOVE "Get directions" links in the markdown
+- The timing information is often structured like:
+  ##### Date:
+  [date range]
+  ##### Time:
+  [time range]
+  [Get directions](...)
+  
+- Pay special attention to sections with "Date:" and "Time:" headers
+- Extract date and time SEPARATELY:
+  * date: Only the date portion (e.g., "22 May 2025", "22 May - 15 Jun 2025")
+  * time: Only the time portion (e.g., "9:00 am - 9:00 pm", "10:00 am - 6:00 pm")
+- Do NOT combine date and time in the same field
+- Extract the EXACT time range provided
+- Do NOT default to any time unless that's the actual time stated
+- Look for patterns like "9:00 am - 9:00 pm", "10:00 am - 6:00 pm", etc.
+- If opening hours are provided (like for attractions), use those as the event times
+
+Other guidelines:
 - All dates should be processed based on Singapore timezone (SGT/UTC+8)
 - If the date is relative (like "this weekend", "next Friday"), try to infer the actual date based on current Singapore time
-- If they state duration of date (like "from now till 31 Aug"), state the date to be "Now - 'End date' "
+- If they state duration of date (like "from now till 31 Aug"), state the date to be "Now - 31 Aug 2025"
 - If no specific date is found, return null for the date
+- If no specific time is found, return null for the time
 - For location, include the full address if available, otherwise just the venue name and city
 - Keep descriptions concise but informative
 - Choose the most appropriate category ID number from the list above
@@ -68,7 +90,8 @@ Important guidelines:
 Return the information as a JSON object with the following structure:
 {
   "name": "Event Name",
-  "date": "24 May 2025 - 31 Aug 2025" OR "24 May 2025" OR "Every Friday" OR "null",
+  "date": "22 May 2025" OR "22 May - 15 Jun 2025" OR "Every Friday" OR null,
+  "time": "9:00 am - 9:00 pm" OR "10:00 am - 6:00 pm" OR null,
   "location": "Venue Name, Address, City",
   "description": "Brief description of the event",
   "category_id": 4
@@ -120,7 +143,7 @@ ${markdown}`;
         throw new Error(parsedResponse.error);
       }
 
-      // Validate required fields (date is optional)
+      // Validate required fields (date and time are optional)
       const requiredFields = ['name', 'location', 'description', 'category_id'];
       for (const field of requiredFields) {
         if (!parsedResponse[field]) {
@@ -131,8 +154,13 @@ ${markdown}`;
       // Handle date field - can be string, null, or flexible format
       let processedDate = null;
       if (parsedResponse.date && parsedResponse.date !== null && parsedResponse.date !== "null") {
-        // Keep the date as-is since it can be flexible formats like "24 May 2025", "Every Friday", etc.
         processedDate = parsedResponse.date.toString().trim();
+      }
+
+      // Handle time field - can be string or null
+      let processedTime = null;
+      if (parsedResponse.time && parsedResponse.time !== null && parsedResponse.time !== "null") {
+        processedTime = parsedResponse.time.toString().trim();
       }
 
       // Try to get coordinates for the location
@@ -146,6 +174,7 @@ ${markdown}`;
       return {
         name: parsedResponse.name.trim(),
         date: processedDate,
+        time: processedTime,
         location: parsedResponse.location.trim(),
         description: parsedResponse.description.trim(),
         category_id: parsedResponse.category_id,

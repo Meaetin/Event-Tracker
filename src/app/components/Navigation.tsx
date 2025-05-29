@@ -64,7 +64,7 @@ export default function Navigation() {
           <div className="flex">
             <div className="flex-shrink-0 flex items-center">
               <Link href="/" className="text-xl font-bold text-blue-600">
-                My App
+                Event Map App
               </Link>
             </div>
             <div className="ml-6 flex items-center space-x-4">
@@ -75,6 +75,15 @@ export default function Navigation() {
                 }`}
               >
                 Home
+              </Link>
+              
+              <Link 
+                href="/events" 
+                className={`px-3 py-2 rounded-md text-sm font-medium ${
+                  isActive('/events') ? 'text-blue-700 bg-blue-50' : 'text-gray-700 hover:text-blue-600'
+                }`}
+              >
+                Events Map
               </Link>
               
               {authUser && (
