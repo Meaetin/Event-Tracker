@@ -6,22 +6,31 @@ import { MapEvent, EventsApiResponse, Category, CategoriesApiResponse } from '..
 interface EventSidebarProps {
   onEventSelect?: (event: MapEvent) => void;
   selectedEventId?: string | null;
+  onCategoryChange?: (categoryId: string) => void;
+  selectedCategory?: string;
 }
 
-export default function EventSidebar({ onEventSelect, selectedEventId }: EventSidebarProps) {
+export default function EventSidebar({ onEventSelect, selectedEventId, onCategoryChange, selectedCategory: propSelectedCategory }: EventSidebarProps) {
   const [events, setEvents] = useState<MapEvent[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
   // Filters
-  const [selectedCategory, setSelectedCategory] = useState<string>('');
+  const [selectedCategory, setSelectedCategory] = useState<string>(propSelectedCategory || '');
   const [searchQuery, setSearchQuery] = useState('');
   const [dateFilter, setDateFilter] = useState<'all' | 'today' | 'week' | 'month'>('all');
 
   useEffect(() => {
     fetchData();
   }, []);
+
+  // Sync selectedCategory with prop
+  useEffect(() => {
+    if (propSelectedCategory !== undefined) {
+      setSelectedCategory(propSelectedCategory);
+    }
+  }, [propSelectedCategory]);
 
   const fetchData = async () => {
     try {
@@ -93,6 +102,36 @@ export default function EventSidebar({ onEventSelect, selectedEventId }: EventSi
     return text.substring(0, maxLength) + '...';
   };
 
+  // Helper function to safely parse date strings
+  const parseEventDate = (dateString: string | null): Date | null => {
+    if (!dateString || dateString.trim() === '') {
+      return null;
+    }
+
+    try {
+      // Handle YYYY-MM-DD format (database format)
+      if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+        // Parse as local date to avoid timezone issues
+        const [year, month, day] = dateString.split('-').map(Number);
+        return new Date(year, month - 1, day); // month is 0-indexed
+      }
+
+      // Try parsing as-is for other formats
+      const date = new Date(dateString);
+      
+      // Check if the date is valid
+      if (isNaN(date.getTime())) {
+        console.warn(`Invalid date format: "${dateString}"`);
+        return null;
+      }
+
+      return date;
+    } catch (error) {
+      console.warn(`Error parsing date "${dateString}":`, error);
+      return null;
+    }
+  };
+
   const getDateFilterRange = () => {
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -136,18 +175,53 @@ export default function EventSidebar({ onEventSelect, selectedEventId }: EventSi
       }
     }
 
-    // Date filter
-    if (dateFilter !== 'all' && event.start_date) {
+    // Enhanced date filter with proper text date handling
+    if (dateFilter !== 'all') {
       const range = getDateFilterRange();
       if (range) {
-        const eventDate = new Date(event.start_date);
-        if (eventDate < range.start || eventDate > range.end) {
+        // Parse the event's start date
+        const eventStartDate = parseEventDate(event.start_date);
+        
+        if (!eventStartDate) {
+          // If we can't parse the start date, exclude it from date-filtered results
+          return false;
+        }
+
+        // Check if event starts within the range
+        const eventStartsInRange = eventStartDate >= range.start && eventStartDate < range.end;
+        
+        // If there's an end date, also check if the event is ongoing during the range
+        let eventOngoingInRange = false;
+        if (event.end_date) {
+          const eventEndDate = parseEventDate(event.end_date);
+          if (eventEndDate) {
+            // Event is ongoing if it starts before range end and ends after range start
+            eventOngoingInRange = eventStartDate < range.end && eventEndDate >= range.start;
+          }
+        }
+
+        // Include event if it starts in range OR is ongoing during the range
+        if (!eventStartsInRange && !eventOngoingInRange) {
           return false;
         }
       }
     }
 
     return true;
+  });
+
+  // Sort filtered events by date (earliest first)
+  const sortedEvents = [...filteredEvents].sort((a, b) => {
+    const dateA = parseEventDate(a.start_date);
+    const dateB = parseEventDate(b.start_date);
+    
+    // Handle null dates - put them at the end
+    if (!dateA && !dateB) return 0;
+    if (!dateA) return 1;
+    if (!dateB) return -1;
+    
+    // Compare valid dates
+    return dateA.getTime() - dateB.getTime();
   });
 
   const handleEventClick = (event: MapEvent) => {
@@ -212,7 +286,12 @@ export default function EventSidebar({ onEventSelect, selectedEventId }: EventSi
           <div>
             <select
               value={selectedCategory}
-              onChange={(e) => setSelectedCategory(e.target.value)}
+              onChange={(e) => {
+                setSelectedCategory(e.target.value);
+                if (onCategoryChange) {
+                  onCategoryChange(e.target.value);
+                }
+              }}
               className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
               <option value="">All Categories</option>
@@ -241,20 +320,20 @@ export default function EventSidebar({ onEventSelect, selectedEventId }: EventSi
 
         {/* Results count */}
         <div className="mt-3 text-sm text-gray-600">
-          {filteredEvents.length} event{filteredEvents.length !== 1 ? 's' : ''} found
+          {sortedEvents.length} event{sortedEvents.length !== 1 ? 's' : ''} found
         </div>
       </div>
 
       {/* Events List */}
       <div className="flex-1 overflow-y-auto">
-        {filteredEvents.length === 0 ? (
+        {sortedEvents.length === 0 ? (
           <div className="p-4 text-center text-gray-500">
             <p>No events found</p>
             <p className="text-sm mt-1">Try adjusting your filters</p>
           </div>
         ) : (
           <div className="space-y-2 p-2">
-            {filteredEvents.map((event) => (
+            {sortedEvents.map((event) => (
               <div
                 key={event.id}
                 onClick={() => handleEventClick(event)}

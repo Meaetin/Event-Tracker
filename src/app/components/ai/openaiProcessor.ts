@@ -77,11 +77,25 @@ IMPORTANT TIMING EXTRACTION GUIDELINES:
 - Look for patterns like "9:00 am - 9:00 pm", "10:00 am - 6:00 pm", etc.
 - If opening hours are provided (like for attractions), use those as the event times
 
+FALLBACK DATE EXTRACTION:
+- If no specific event start date is found in the content, look for the article publication date
+- The publication date usually appears in this format in the markdown:
+  [Author Name](link)
+  •
+  [Date] (e.g., "23 May 2025")
+  •
+  [Category]
+  •
+  [Reading time]
+- The publication date is typically located below the author name and above the category/reading time
+- Use this publication date as the event date if no other specific event date is mentioned
+- Format the fallback date in the same way (e.g., "23 May 2025")
+
 Other guidelines:
 - All dates should be processed based on Singapore timezone (SGT/UTC+8)
 - If the date is relative (like "this weekend", "next Friday"), try to infer the actual date based on current Singapore time
 - If they state duration of date (like "from now till 31 Aug"), state the date to be "Now - 31 Aug 2025"
-- If no specific date is found, return null for the date
+- If no specific date is found AND no publication date can be extracted, return null for the date
 - If no specific time is found, return null for the time
 - For location, include the full address if available, otherwise just the venue name and city
 - Keep descriptions concise but informative

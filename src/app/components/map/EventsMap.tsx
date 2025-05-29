@@ -23,6 +23,7 @@ interface EventsMapProps {
   center?: LatLngExpression;
   zoom?: number;
   selectedEventId?: string | null;
+  selectedCategory?: string;
 }
 
 export interface EventsMapRef {
@@ -32,8 +33,9 @@ export interface EventsMapRef {
 const EventsMap = forwardRef<EventsMapRef, EventsMapProps>(({ 
   events: propEvents, 
   center = defaultPosition, 
-  zoom = 12,
-  selectedEventId 
+  zoom = 11,
+  selectedEventId,
+  selectedCategory 
 }, ref) => {
   const [events, setEvents] = useState<MapEvent[]>(propEvents || []);
   const [loading, setLoading] = useState(!propEvents);
@@ -151,14 +153,26 @@ const EventsMap = forwardRef<EventsMapRef, EventsMapProps>(({
     return text.substring(0, maxLength) + '...';
   };
 
-  // Filter events that have valid coordinates
-  const validEvents = events.filter(event => 
-    event.coordinates && 
-    typeof event.coordinates.latitude === 'number' && 
-    typeof event.coordinates.longitude === 'number' &&
-    !isNaN(event.coordinates.latitude) && 
-    !isNaN(event.coordinates.longitude)
-  );
+  // Filter events that have valid coordinates and match selected category
+  const validEvents = events.filter(event => {
+    // First check if coordinates are valid
+    const hasValidCoordinates = event.coordinates && 
+      typeof event.coordinates.latitude === 'number' && 
+      typeof event.coordinates.longitude === 'number' &&
+      !isNaN(event.coordinates.latitude) && 
+      !isNaN(event.coordinates.longitude);
+    
+    if (!hasValidCoordinates) {
+      return false;
+    }
+    
+    // Then check category filter
+    if (selectedCategory && selectedCategory !== '') {
+      return event.category_id?.toString() === selectedCategory;
+    }
+    
+    return true;
+  });
 
   return (
     <div className="relative w-full h-full">
@@ -201,69 +215,72 @@ const EventsMap = forwardRef<EventsMapRef, EventsMapProps>(({
               }
             }}
           >
-            <Popup maxWidth={320} className="event-popup">
-              <div className="p-2 max-w-sm">
-                {/* Event Image */}
-                {event.images && event.images.length > 0 && (
-                  <div className="mb-3 overflow-hidden rounded-lg">
-                    <img 
-                      src={event.images[0]} 
-                      alt={event.name}
-                      className="w-full h-40 object-cover hover:scale-105 transition-transform duration-200"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).style.display = 'none';
-                      }}
-                    />
+            <Popup maxWidth={450} className="event-popup">
+              <div className="p-1 max-w-lg">
+                <div className="flex gap-2">
+                  {/* Left: Event Image */}
+                  {event.images && event.images.length > 0 && (
+                    <div className="w-32 h-24 flex-shrink-0 overflow-hidden rounded">
+                      <img 
+                        src={event.images[0]} 
+                        alt={event.name}
+                        className="w-full h-full object-cover hover:scale-105 transition-transform duration-200"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.display = 'none';
+                        }}
+                      />
+                    </div>
+                  )}
+                  
+                  {/* Right: Text content */}
+                  <div className="flex-1 min-w-0">
+                    {/* Event Name */}
+                    <h3 className="font-bold text-base text-gray-900 mb-1 leading-tight">
+                      {event.name}
+                    </h3>
+                    
+                    {/* Date */}
+                    <div className="flex items-center mb-0.5 text-xs text-gray-600">
+                      <svg className="w-3 h-3 mr-1 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                      <span>{formatDate(event.start_date, event.end_date)}</span>
+                    </div>
+                    
+                    {/* Time - Show even if no time available */}
+                    <div className="flex items-center mb-0.5 text-xs text-gray-600">
+                      <svg className="w-3 h-3 mr-1 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <span>{formatTime(event.time) || 'Time TBA'}</span>
+                    </div>
+                    
+                    {/* Location */}
+                    <div className="flex items-start text-xs text-gray-600">
+                      <svg className="w-3 h-3 mr-1 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                      <span className="leading-tight">{event.location}</span>
+                    </div>
                   </div>
-                )}
-                
-                {/* Event Name */}
-                <h3 className="font-bold text-lg text-gray-900 mb-2 leading-tight">
-                  {event.name}
-                </h3>
-                
-                {/* Date */}
-                <div className="flex items-center mb-2 text-sm text-gray-600">
-                  <svg className="w-4 h-4 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                  </svg>
-                  <span>{formatDate(event.start_date, event.end_date)}</span>
-                </div>
-                
-                {/* Time */}
-                {formatTime(event.time) && (
-                  <div className="flex items-center mb-2 text-sm text-gray-600">
-                    <svg className="w-4 h-4 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <span>{formatTime(event.time)}</span>
-                  </div>
-                )}
-                
-                {/* Location */}
-                <div className="flex items-start mb-3 text-sm text-gray-600">
-                  <svg className="w-4 h-4 mr-2 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                  </svg>
-                  <span className="leading-tight">{event.location}</span>
                 </div>
                 
                 {/* Description */}
                 {event.description && (
-                  <div className="mb-3">
-                    <p className="text-sm text-gray-700 leading-relaxed">
-                      {truncateText(event.description)}
+                  <div className="mb-2">
+                    <p className="text-xs text-gray-700 leading-relaxed">
+                      {event.description}
                     </p>
                   </div>
                 )}
                 
                 {/* Bottom section with Category and Event URL */}
-                <div className="pt-2 border-t">
+                <div className="pt-1 border-t border-gray-200">
                   <div className="flex items-center justify-between">
                     {/* Category */}
                     {event.categories && (
-                      <span className="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">
+                      <span className="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-0.5 rounded-full">
                         {event.categories.name}
                       </span>
                     )}
@@ -273,11 +290,11 @@ const EventsMap = forwardRef<EventsMapRef, EventsMapProps>(({
                       href={event.url} 
                       target="_blank" 
                       rel="noopener noreferrer"
-                      className="inline-flex items-center text-blue-600 hover:text-blue-800 text-sm font-medium"
+                      className="inline-flex items-center text-blue-600 hover:text-blue-800 text-xs font-medium"
                     >
-                      <span>View Event Details</span>
-                      <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                      <span>View Details</span>
+                      <svg className="w-3 h-3 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                       </svg>
                     </a>
                   </div>

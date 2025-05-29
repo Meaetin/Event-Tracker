@@ -22,6 +22,7 @@ const EventsMap = dynamic(() => import('../components/map/EventsMap'), {
 
 export default function EventsPage() {
   const [selectedEvent, setSelectedEvent] = useState<MapEvent | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<string>('');
   const mapRef = useRef<any>(null);
 
   const handleEventSelect = useCallback((event: MapEvent) => {
@@ -31,6 +32,12 @@ export default function EventsPage() {
     if (event.coordinates && mapRef.current) {
       mapRef.current.focusOnEvent(event);
     }
+  }, []);
+
+  const handleCategoryChange = useCallback((categoryId: string) => {
+    setSelectedCategory(categoryId);
+    // Clear selected event when category changes to avoid confusion
+    setSelectedEvent(null);
   }, []);
 
   const handleMapRef = useCallback((ref: any) => {
@@ -78,6 +85,8 @@ export default function EventsPage() {
           <EventSidebar 
             onEventSelect={handleEventSelect}
             selectedEventId={selectedEvent?.id || null}
+            onCategoryChange={handleCategoryChange}
+            selectedCategory={selectedCategory}
           />
         </Suspense>
 
@@ -94,6 +103,7 @@ export default function EventsPage() {
             <EventsMap 
               ref={handleMapRef}
               selectedEventId={selectedEvent?.id || null}
+              selectedCategory={selectedCategory}
               center={selectedEvent?.coordinates ? 
                 [selectedEvent.coordinates.latitude, selectedEvent.coordinates.longitude] : 
                 undefined
