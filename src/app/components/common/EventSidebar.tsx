@@ -76,8 +76,23 @@ export default function EventSidebar({
   const formatDate = (startDate: string | null, endDate: string | null) => {
     if (!startDate) return 'Date TBA';
     
+    // Handle special text dates that shouldn't be parsed
+    if (startDate.toLowerCase().includes('now open') || 
+        startDate.toLowerCase().includes('tba') ||
+        startDate.toLowerCase().includes('check website') ||
+        startDate.toLowerCase().includes('ongoing') ||
+        startDate.toLowerCase().includes('every')) {
+      return startDate; // Return the text as-is
+    }
+    
     try {
       const start = new Date(startDate);
+      
+      // Check if the parsed date is valid
+      if (isNaN(start.getTime())) {
+        return startDate; // Return original string if parsing fails
+      }
+      
       const formattedStart = start.toLocaleDateString('en-SG', {
         weekday: 'short',
         month: 'short',
@@ -86,7 +101,20 @@ export default function EventSidebar({
       
       // If there's an end date and it's different from start date, show range
       if (endDate && endDate !== startDate) {
+        // Handle special text for end dates too
+        if (endDate.toLowerCase().includes('now open') || 
+            endDate.toLowerCase().includes('tba') ||
+            endDate.toLowerCase().includes('check website') ||
+            endDate.toLowerCase().includes('ongoing') ||
+            endDate.toLowerCase().includes('every')) {
+          return `${formattedStart} - ${endDate}`;
+        }
+        
         const end = new Date(endDate);
+        if (isNaN(end.getTime())) {
+          return `${formattedStart} - ${endDate}`;
+        }
+        
         const formattedEnd = end.toLocaleDateString('en-SG', {
           weekday: 'short',
           month: 'short',
@@ -103,6 +131,12 @@ export default function EventSidebar({
 
   const formatTime = (timeString: string | null) => {
     if (!timeString) return null;
+    
+    // Truncate very long time strings to keep layout clean
+    if (timeString.length > 50) {
+      return timeString.substring(0, 30) + '...';
+    }
+    
     return timeString; // Return the time string as-is since it's already formatted
   };
 
@@ -115,6 +149,30 @@ export default function EventSidebar({
     // Permanent stores filter
     if (!showPermanentStores && event.store_type === 'permanent_store') {
       return false;
+    }
+
+    // Expired events filter (backup client-side check)
+    if (event.store_type !== 'permanent_store' && event.end_date) {
+      // Skip text-based dates that can't be parsed
+      if (!(event.end_date.toLowerCase().includes('now open') || 
+            event.end_date.toLowerCase().includes('tba') ||
+            event.end_date.toLowerCase().includes('check website'))) {
+        try {
+          const endDate = new Date(event.end_date);
+          const now = new Date();
+          
+          if (!isNaN(endDate.getTime())) {
+            // Add a day buffer to avoid timezone issues
+            const endOfDay = new Date(endDate);
+            endOfDay.setHours(23, 59, 59, 999);
+            if (endOfDay < now) {
+              return false; // Event is expired
+            }
+          }
+        } catch {
+          // If there's any error parsing the date, keep the event
+        }
+      }
     }
 
     // Category filter
@@ -199,10 +257,9 @@ export default function EventSidebar({
   }
 
   return (
-    <div className="w-80 bg-white shadow-lg border-r border-gray-200 flex flex-col h-full">
+    <div className="w-80 bg-white shadow-lg border-r border-gray-200 h-full overflow-y-auto">
       {/* Header */}
       <div className="p-4 border-b border-gray-200">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Events</h2>
         
         {/* Search */}
         <div className="mb-3">
@@ -218,23 +275,20 @@ export default function EventSidebar({
         {/* Filters */}
         <div className="space-y-3">
           {/* Event Type Filter */}
-          <div>
-            <div className="text-sm font-medium text-gray-700 mb-2">Event Types</div>
-            <div className="space-y-2">
-              <label className="flex items-center cursor-pointer hover:bg-gray-50 p-1 rounded">
-                <input
-                  type="checkbox"
-                  checked={showPermanentStores}
-                  onChange={(e) => {
-                    if (onPermanentStoresChange) {
-                      onPermanentStoresChange(e.target.checked);
-                    }
-                  }}
-                  className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                />
-                <span className="ml-2 text-sm text-gray-700">Show permanent stores</span>
-              </label>
-            </div>
+          <div className='pl-1'>
+            <label className="flex items-center cursor-pointer hover:bg-gray-50 p-1 rounded">
+              <input
+                type="checkbox"
+                checked={showPermanentStores}
+                onChange={(e) => {
+                  if (onPermanentStoresChange) {
+                    onPermanentStoresChange(e.target.checked);
+                  }
+                }}
+                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+              />
+              <span className="ml-2 text-sm text-gray-700">Show permanent stores</span>
+            </label>
           </div>
 
           {/* Category Filter */}
@@ -287,19 +341,19 @@ export default function EventSidebar({
       </div>
 
       {/* Events List */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="p-2">
         {sortedEvents.length === 0 ? (
           <div className="p-4 text-center text-gray-500">
             <p>No events found</p>
             <p className="text-sm mt-1">Try adjusting your filters</p>
           </div>
         ) : (
-          <div className="space-y-2 p-2">
+          <div className="space-y-3">
             {sortedEvents.map((event) => (
               <div
                 key={event.id}
                 onClick={() => handleEventClick(event)}
-                className={`p-3 rounded-lg border cursor-pointer transition-all duration-200 hover:shadow-md hover:scale-[1.02] ${
+                className={`p-4 rounded-lg border cursor-pointer transition-all duration-200 hover:shadow-md hover:scale-[1.02] ${
                   selectedEventId === event.id
                     ? 'border-blue-500 bg-blue-50 shadow-md'
                     : 'border-gray-200 hover:border-gray-300'
@@ -307,11 +361,11 @@ export default function EventSidebar({
               >
                 {/* Event Image */}
                 {event.images && event.images.length > 0 && (
-                  <div className="mb-3 overflow-hidden rounded-lg">
+                  <div className="mb-4 overflow-hidden rounded-lg">
                     <img 
                       src={event.images[0]} 
                       alt={event.name}
-                      className="w-full h-32 object-cover hover:scale-105 transition-transform duration-200"
+                      className="w-full h-40 object-cover hover:scale-105 transition-transform duration-200"
                       onError={(e) => {
                         (e.target as HTMLImageElement).style.display = 'none';
                       }}
@@ -320,13 +374,13 @@ export default function EventSidebar({
                 )}
 
                 {/* Event Name */}
-                <h3 className="font-medium text-gray-900 mb-1 leading-tight">
+                <h3 className="font-semibold text-gray-900 mb-2 leading-tight text-base">
                   {event.name}
                 </h3>
 
                 {/* Date */}
-                <div className="flex items-center mb-1 text-xs text-gray-600">
-                  <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div className="flex items-center mb-2 text-sm text-gray-600">
+                  <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                   </svg>
                   <span>{formatDate(event.start_date, event.end_date)}</span>
@@ -334,8 +388,8 @@ export default function EventSidebar({
 
                 {/* Time */}
                 {formatTime(event.time) && (
-                  <div className="flex items-center mb-1 text-xs text-gray-600">
-                    <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <div className="flex items-center mb-2 text-sm text-gray-600">
+                    <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                     <span>{formatTime(event.time)}</span>
@@ -343,18 +397,18 @@ export default function EventSidebar({
                 )}
 
                 {/* Location */}
-                <div className="flex items-start mb-2 text-xs text-gray-600">
-                  <svg className="w-3 h-3 mr-1 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div className="flex items-start mb-3 text-sm text-gray-600">
+                  <svg className="w-5 h-5 mr-2 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                   </svg>
-                  <span className="leading-tight">{truncateText(event.location, 50)}</span>
+                  <span className="leading-tight">{truncateText(event.location, 60)}</span>
                 </div>
 
                 {/* Description */}
                 {event.description && (
-                  <p className="text-xs text-gray-700 mb-2 leading-relaxed">
-                    {truncateText(event.description, 80)}
+                  <p className="text-sm text-gray-700 mb-3 leading-relaxed">
+                    {truncateText(event.description, 120)}
                   </p>
                 )}
 
@@ -362,7 +416,7 @@ export default function EventSidebar({
                 <div className="flex justify-between items-center">
                   {/* Category */}
                   {event.categories && (
-                    <span className="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">
+                    <span className="inline-block bg-blue-100 text-blue-800 text-sm px-3 py-1 rounded-full font-medium">
                       {Array.isArray(event.categories) ? event.categories[0]?.name : event.categories.name}
                     </span>
                   )}
@@ -370,10 +424,10 @@ export default function EventSidebar({
                   {/* Coordinates indicator */}
                   {event.coordinates && (
                     <div className="flex items-center text-green-600" title="Click to view on map">
-                      <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-5 h-5 mr-1" fill="currentColor" viewBox="0 0 24 24">
                         <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
                       </svg>
-                      <span className="text-xs">View on map</span>
+                      <span className="text-sm font-medium">View on map</span>
                     </div>
                   )}
                 </div>

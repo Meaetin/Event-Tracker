@@ -142,8 +142,23 @@ const EventsMap = forwardRef<EventsMapRef, EventsMapProps>(({
   const formatDate = (startDate: string | null, endDate: string | null) => {
     if (!startDate) return 'Date TBA';
     
+    // Handle special text dates that shouldn't be parsed
+    if (startDate.toLowerCase().includes('now open') || 
+        startDate.toLowerCase().includes('tba') ||
+        startDate.toLowerCase().includes('check website') ||
+        startDate.toLowerCase().includes('ongoing') ||
+        startDate.toLowerCase().includes('every')) {
+      return startDate; // Return the text as-is
+    }
+    
     try {
       const start = new Date(startDate);
+      
+      // Check if the parsed date is valid
+      if (isNaN(start.getTime())) {
+        return startDate; // Return original string if parsing fails
+      }
+      
       const formattedStart = start.toLocaleDateString('en-SG', {
         weekday: 'short',
         year: 'numeric',
@@ -153,7 +168,20 @@ const EventsMap = forwardRef<EventsMapRef, EventsMapProps>(({
       
       // If there's an end date and it's different from start date, show range
       if (endDate && endDate !== startDate) {
+        // Handle special text for end dates too
+        if (endDate.toLowerCase().includes('now open') || 
+            endDate.toLowerCase().includes('tba') ||
+            endDate.toLowerCase().includes('check website') ||
+            endDate.toLowerCase().includes('ongoing') ||
+            endDate.toLowerCase().includes('every')) {
+          return `${formattedStart} - ${endDate}`;
+        }
+        
         const end = new Date(endDate);
+        if (isNaN(end.getTime())) {
+          return `${formattedStart} - ${endDate}`;
+        }
+        
         const formattedEnd = end.toLocaleDateString('en-SG', {
           weekday: 'short',
           year: 'numeric',

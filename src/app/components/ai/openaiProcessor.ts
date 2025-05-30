@@ -258,8 +258,8 @@ ${markdown}`;
 
       // Special handling for permanent stores without opening dates
       if (!processedDate && parsedResponse.store_type === 'permanent_store') {
-        processedDate = "Now Open";
-        console.log(`Set date to "Now Open" for permanent store: ${parsedResponse.name}`);
+        processedDate = "Ongoing";
+        console.log(`Set date to "Ongoing" for permanent store: ${parsedResponse.name}`);
       }
 
       // Handle time field - can be string or null

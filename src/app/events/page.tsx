@@ -56,23 +56,16 @@ export default function EventsPage() {
   return (
     <div className="h-screen flex flex-col">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Events Map</h1>
-            <p className="text-gray-600 mt-1">Discover events happening around Singapore</p>
+      <div className="flex items-center justify-between">
+        {selectedEvent && (
+          <div className="text-right">
+            <p className="text-sm text-gray-600">Selected Event:</p>
+            <p className="font-medium text-gray-900 max-w-xs truncate">{selectedEvent.name}</p>
+            {selectedEvent.coordinates && (
+              <p className="text-xs text-green-600">📍 Location available</p>
+            )}
           </div>
-          
-          {selectedEvent && (
-            <div className="text-right">
-              <p className="text-sm text-gray-600">Selected Event:</p>
-              <p className="font-medium text-gray-900 max-w-xs truncate">{selectedEvent.name}</p>
-              {selectedEvent.coordinates && (
-                <p className="text-xs text-green-600">📍 Location available</p>
-              )}
-            </div>
-          )}
-        </div>
+        )}
       </div>
 
       {/* Main Content */}

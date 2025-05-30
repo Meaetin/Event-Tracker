@@ -109,6 +109,51 @@ export default function AdminDashboard() {
   const SCRAPED_DATA_KEY = 'pending_scraped_data';
   const SCRAPED_URL_KEY = 'pending_scraped_url';
 
+  // Helper function to safely format dates
+  const formatDate = (dateString: string | null) => {
+    if (!dateString) return 'No date specified';
+    
+    // Handle special text dates that shouldn't be parsed
+    if (dateString.toLowerCase().includes('now open') || 
+        dateString.toLowerCase().includes('tba') ||
+        dateString.toLowerCase().includes('check website') ||
+        dateString.toLowerCase().includes('ongoing') ||
+        dateString.toLowerCase().includes('every')) {
+      return dateString; // Return the text as-is
+    }
+    
+    try {
+      const date = new Date(dateString);
+      
+      // Check if the parsed date is valid
+      if (isNaN(date.getTime())) {
+        return dateString; // Return original string if parsing fails
+      }
+      
+      return date.toLocaleDateString();
+    } catch {
+      return dateString; // Return original string if parsing fails
+    }
+  };
+
+  // Helper function to safely format timestamps (includes both date and time)
+  const formatTimestamp = (dateString: string | null) => {
+    if (!dateString) return 'No timestamp';
+    
+    try {
+      const date = new Date(dateString);
+      
+      // Check if the parsed date is valid
+      if (isNaN(date.getTime())) {
+        return dateString; // Return original string if parsing fails
+      }
+      
+      return `${date.toLocaleDateString()} at ${date.toLocaleTimeString()}`;
+    } catch {
+      return dateString; // Return original string if parsing fails
+    }
+  };
+
   // Monitor connection status
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
@@ -958,7 +1003,7 @@ export default function AdminDashboard() {
                           Source: <a href={listing.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline break-all">{listing.url}</a>
                         </p>
                         <p className="text-sm text-gray-600">
-                          Added: {new Date(listing.created_at).toLocaleDateString()}
+                          Added: {formatTimestamp(listing.created_at)}
                         </p>
                       </div>
                       {(listing.status === 'pending' || listing.status === 'error') && (
@@ -1058,9 +1103,9 @@ export default function AdminDashboard() {
                               <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                               </svg>
-                              <span className="font-medium">Date:</span> {event.start_date ? new Date(event.start_date).toLocaleDateString() : 'No date specified'}
+                              <span className="font-medium">Date:</span> {formatDate(event.start_date)}
                               {event.end_date && event.end_date !== event.start_date && (
-                                <span> - {new Date(event.end_date).toLocaleDateString()}</span>
+                                <span> - {formatDate(event.end_date)}</span>
                               )}
                             </span>
                           </p>
@@ -1182,30 +1227,18 @@ export default function AdminDashboard() {
                             <div>
                               <label className="text-sm font-medium text-gray-700">Start Date:</label>
                               <p className="text-sm text-gray-900 mt-1">
-                                {event.start_date ? (
-                                  <>
-                                    {new Date(event.start_date).toLocaleDateString()}
-                                    <br />
-                                    <span className="text-xs text-gray-500">({event.start_date})</span>
-                                  </>
-                                ) : (
-                                  'No date specified'
-                                )}
+                                {formatDate(event.start_date)}
+                                <br />
+                                <span className="text-xs text-gray-500">({event.start_date})</span>
                               </p>
                             </div>
                             
                             <div>
                               <label className="text-sm font-medium text-gray-700">End Date:</label>
                               <p className="text-sm text-gray-900 mt-1">
-                                {event.end_date ? (
-                                  <>
-                                    {new Date(event.end_date).toLocaleDateString()}
-                                    <br />
-                                    <span className="text-xs text-gray-500">({event.end_date})</span>
-                                  </>
-                                ) : (
-                                  'No end date specified'
-                                )}
+                                {formatDate(event.end_date)}
+                                <br />
+                                <span className="text-xs text-gray-500">({event.end_date})</span>
                               </p>
                             </div>
                             
@@ -1231,14 +1264,14 @@ export default function AdminDashboard() {
                             <div>
                               <label className="text-sm font-medium text-gray-700">Created:</label>
                               <p className="text-sm text-gray-900 mt-1">
-                                {new Date(event.created_at).toLocaleDateString()} at {new Date(event.created_at).toLocaleTimeString()}
+                                {formatTimestamp(event.created_at)}
                               </p>
                             </div>
                             
                             <div>
                               <label className="text-sm font-medium text-gray-700">Last Updated:</label>
                               <p className="text-sm text-gray-900 mt-1">
-                                {new Date(event.updated_at).toLocaleDateString()} at {new Date(event.updated_at).toLocaleTimeString()}
+                                {formatTimestamp(event.updated_at)}
                               </p>
                             </div>
                           </div>
@@ -1322,9 +1355,9 @@ export default function AdminDashboard() {
                           <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                           </svg>
-                          <span className="font-medium">Date:</span> {event.start_date ? new Date(event.start_date).toLocaleDateString() : 'No date specified'}
+                          <span className="font-medium">Date:</span> {formatDate(event.start_date)}
                           {event.end_date && event.end_date !== event.start_date && (
-                            <span> - {new Date(event.end_date).toLocaleDateString()}</span>
+                            <span> - {formatDate(event.end_date)}</span>
                           )}
                         </span>
                       </p>
