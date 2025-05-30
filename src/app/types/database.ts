@@ -26,6 +26,7 @@ export interface Event {
     coordinates: string | null;  // PostgreSQL point format: "(longitude,latitude)"
     description: string | null;
     category_id: number | null;
+    store_type: 'event' | 'permanent_store';  // NEW: Classification field
     status: EventStatus;
     images: string[];
     created_at: string;

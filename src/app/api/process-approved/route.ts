@@ -168,8 +168,9 @@ export async function POST(req: NextRequest) {
         console.log(`Processed event data for ${listing.url}:`, eventData.name);
         console.log('eventData:', eventData);
 
-        // Step 3: Use category_id directly from AI response
-        const categoryId = eventData.category_id;
+        // Step 3: Use category_ids directly from AI response
+        const primaryCategoryId = eventData.category_ids[0]; // First category as primary
+        const allCategoryIds = eventData.category_ids;
 
         // Step 4: Create event in database
         // Use the existing image from the listing instead of extracting from markdown
@@ -188,7 +189,9 @@ export async function POST(req: NextRequest) {
           location: eventData.location,
           coordinates: eventData.coordinates ? `(${eventData.coordinates.x},${eventData.coordinates.y})` : null,
           description: eventData.description,
-          category_id: categoryId,
+          category_id: primaryCategoryId, // Keep for backwards compatibility
+          category_ids: allCategoryIds, // New: Multiple categories
+          store_type: eventData.store_type,
           status: 'pending' as const,
           images: eventImages
         };

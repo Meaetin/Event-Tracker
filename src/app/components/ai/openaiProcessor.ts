@@ -3,10 +3,12 @@ import OpenAI from 'openai';
 interface ProcessedEventData {
   name: string;
   date: string | null; // Date only (e.g., "22 May 2025" or "22 May - 15 Jun 2025")
-  time: string | null; // Time only (e.g., "9:00 am - 9:00 pm")
+  time: string | null; // Time only (e.g., "9:00 am - 9:00 pm") OR opening hours for stores
   location: string;
   description: string;
-  category_id: number;
+  category_ids: number[]; // Changed: Now supports multiple categories
+  store_type: 'event' | 'permanent_store'; // NEW: Type classification
+  store_type_reasoning: string; // NEW: Explanation for store type choice
   coordinates?: {
     y: number; // latitude
     x: number; // longitude
@@ -43,6 +45,37 @@ Your task is to analyze the provided markdown content and extract the following 
 - Location/venue (required, include full address if available)
 - Description (required, short description of the event in 1-2 sentences)
 - Category ID (required, choose the appropriate number from the categories below)
+- Store Type (required, classify as 'event' or 'permanent_store')
+
+MULTIPLE CATEGORIES SUPPORT:
+- You can assign multiple categories to better describe the event/venue
+- Choose 1-3 most relevant categories (avoid over-categorizing)
+- List them in order of relevance (most relevant first)
+- Examples:
+  * Restaurant with live music: [2, 4] (Food & Drinks, Music & Concerts)
+  * Tech conference: [8, 12] (Technology, Business & Networking)
+  * Spa & wellness center: [14, 17] (Health & Wellness, Beauty & Personal Care)
+  * Children's art workshop: [7, 1] (Family & Kids, Arts & Culture)
+
+STORE TYPE CLASSIFICATION:
+- Use 'event' for: Time-limited activities, festivals, concerts, exhibitions, classes, tours, workshops, performances, seasonal events
+- Use 'permanent_store' for: Restaurants, cafes, museums, shops, attractions, venues, establishments that operate regularly with fixed opening hours
+- Key indicators for permanent_store:
+  * Has regular opening hours (e.g., "Mon-Fri 9am-6pm")
+  * Is a business/establishment (restaurant, cafe, shop, museum, aquarium, attraction)
+  * NO specific end date mentioned (this is the strongest indicator)
+  * Described as always available or ongoing
+  * Only shows operating hours, not event dates
+  * Opening of a new business/venue (opening date = start of operations, not an event)
+- Key indicators for event:
+  * Has specific start/end dates with LIMITED TIME language
+  * Explicitly described as temporary ("for one week only", "until supplies last", "limited time")
+  * Uses event language (festival, concert, exhibition, workshop, performance)
+  * Described as happening "on" or "until" specific dates with time-limited context
+- IMPORTANT: Opening dates for businesses (restaurants, shops, museums, aquariums) indicate permanent store launch, NOT events
+- RULE: If no end date is mentioned and only opening hours are provided, classify as 'permanent_store'
+- RULE: Opening of permanent establishments (aquarium, restaurant, shop) = 'permanent_store', unless explicitly described as temporary
+- ALWAYS provide reasoning: Explain why you chose 'event' or 'permanent_store' based on the indicators found in the content
 
 Available categories:
 1: "Arts & Culture"
@@ -56,7 +89,15 @@ Available categories:
 9: "Education"
 10: "Others"
 11: "Entertainment"
+12: "Business & Networking"
 13: "Attractions"
+14: "Health & Wellness"
+15: "Shopping & Retail"
+16: "Nightlife & Bars"
+17: "Beauty & Personal Care"
+18: "Professional Services"
+19: "Religious & Spiritual"
+20: "Transportation & Travel"
 
 IMPORTANT TIMING EXTRACTION GUIDELINES:
 - Look specifically for timing information that appears ABOVE "Get directions" links in the markdown
@@ -70,23 +111,30 @@ IMPORTANT TIMING EXTRACTION GUIDELINES:
 - Pay special attention to sections with "Date:" and "Time:" headers
 - Extract date and time SEPARATELY:
   * date: Only the date portion (e.g., "22 May 2025", "22 May - 15 Jun 2025")
-  * time: Only the time portion (e.g., "9:00 am - 9:00 pm", "10:00 am - 6:00 pm")
+  * time: Only the time portion (e.g., "9:00am - 9:00pm", "10:00am - 6:00pm") - NO SPACES around am/pm
 - Do NOT combine date and time in the same field
-- Extract the EXACT time range provided
+- Extract the EXACT time range provided but apply proper formatting
 - Do NOT default to any time unless that's the actual time stated
-- Look for patterns like "9:00 am - 9:00 pm", "10:00 am - 6:00 pm", etc.
-- If opening hours are provided (like for attractions), use those as the event times
+- Look for patterns like "9:00 am - 9:00 pm", "10:00 am - 6:00 pm", etc. but format as "9:00am - 9:00pm"
+- If opening hours are provided (like for attractions), use those as the event times with proper formatting
 
 DAY RANGE FORMATTING FOR TIMES:
-- When consecutive days are listed with the same hours (e.g., "Mon - Tue - Wed, 9am - 9pm"), format as a range
-- Use format: "Mon - Wed: 9:00am - 9:00pm" instead of listing all individual days
+- When consecutive days are listed with the same hours, format as a range using FIRST - LAST format
+- Use format: "Mon - Wed: 9:00am - 9:00pm" (NO SPACES around am/pm)
 - For non-consecutive days, list them separately (e.g., "Mon, Wed, Fri: 9:00am - 9:00pm")
-- Always use proper time formatting with AM/PM (e.g., "9:00am" not "9am")
-- Examples:
+- ALWAYS condense consecutive days: "Sun - Mon - Tue - Wed - Thu" becomes "Sun - Thu"
+- NO SPACES in time format: use "7:30pm" NOT "7:30 pm"
+- Examples of CORRECT formatting:
   * "Mon - Tue - Wed, 9am - 9pm" → "Mon - Wed: 9:00am - 9:00pm"
   * "Monday to Friday, 10am - 6pm" → "Mon - Fri: 10:00am - 6:00pm"
   * "Weekdays 9am - 5pm" → "Mon - Fri: 9:00am - 5:00pm"
   * "Weekends 10am - 6pm" → "Sat - Sun: 10:00am - 6:00pm"
+  * "Fri - Sat: 7:30pm - 12:00am; Sun - Mon - Tue - Wed - Thu: 7:30pm - 11:00pm" → "Fri - Sat: 7:30pm - 12:00am; Sun - Thu: 7:30pm - 11:00pm"
+
+PERMANENT STORE DETECTION:
+- If there is NO specific end date mentioned, automatically classify as 'permanent_store'
+- If the content only shows opening hours without event dates, it's a permanent_store
+- If no event-specific dates are found, treat as permanent_store with opening hours
 
 LOCATION EXTRACTION GUIDELINES:
 - If multiple locations are mentioned, use the FIRST location only
@@ -123,10 +171,12 @@ Return the information as a JSON object with the following structure:
 {
   "name": "Event Name",
   "date": "22 May 2025" OR "22 May - 15 Jun 2025" OR "Every Friday" OR null,
-  "time": "9:00 am - 9:00 pm" OR "10:00 am - 6:00 pm" OR null,
+  "time": "9:00am - 9:00pm" OR "Mon - Fri: 10:00am - 6:00pm" OR null,
   "location": "Venue Name, Address, City",
   "description": "Brief description of the event",
-  "category_id": 4
+  "category_ids": [4, 2],
+  "store_type": "event" OR "permanent_store",
+  "store_type_reasoning": "Classified as 'permanent_store' because it's a new aquarium opening with regular operating hours, indicating the start of permanent business operations, not a temporary event." OR "Classified as 'event' because it explicitly states 'limited 3-day exhibition' with specific end date, indicating temporary activity." OR "Classified as 'permanent_store' because it shows regular operating hours (Mon-Fri: 9am-6pm) with no time-limited language or end date mentioned."
 }
 
 If you cannot extract the required information, return an error object:
@@ -176,10 +226,27 @@ ${markdown}`;
       }
 
       // Validate required fields (date and time are optional)
-      const requiredFields = ['name', 'location', 'description', 'category_id'];
+      const requiredFields = ['name', 'location', 'description', 'category_ids', 'store_type', 'store_type_reasoning'];
       for (const field of requiredFields) {
         if (!parsedResponse[field]) {
           throw new Error(`Missing required field: ${field}`);
+        }
+      }
+
+      // Validate store_type field
+      if (!['event', 'permanent_store'].includes(parsedResponse.store_type)) {
+        throw new Error(`Invalid store_type: ${parsedResponse.store_type}. Must be 'event' or 'permanent_store'`);
+      }
+
+      // Validate category_ids field
+      if (!Array.isArray(parsedResponse.category_ids) || parsedResponse.category_ids.length === 0) {
+        throw new Error('category_ids must be a non-empty array');
+      }
+      
+      // Validate each category ID
+      for (const categoryId of parsedResponse.category_ids) {
+        if (!Number.isInteger(categoryId) || categoryId < 1 || categoryId > 20) {
+          throw new Error(`Invalid category_id: ${categoryId}. Must be between 1 and 20`);
         }
       }
 
@@ -209,7 +276,9 @@ ${markdown}`;
         time: processedTime,
         location: parsedResponse.location.trim(),
         description: parsedResponse.description.trim(),
-        category_id: parsedResponse.category_id,
+        category_ids: parsedResponse.category_ids,
+        store_type: parsedResponse.store_type,
+        store_type_reasoning: parsedResponse.store_type_reasoning,
         coordinates
       };
 
