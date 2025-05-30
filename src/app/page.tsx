@@ -6,7 +6,7 @@ import Link from 'next/link';
 
 // Add cache-busting headers
 export const metadata: Metadata = {
-  title: 'Event Map App',
+  title: 'EventScapeSG',
   description: 'Discover events happening around Singapore with our interactive map',
   // Add cache directives
   other: {

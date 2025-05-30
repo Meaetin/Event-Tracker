@@ -8,8 +8,8 @@ import { Suspense } from 'react';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'My App',
-  description: 'App with role-based access',
+  title: 'EventScapeSG',
+  description: 'Discover events happening around Singapore with EventScapeSG',
 };
 
 function LoadingSpinner() {
