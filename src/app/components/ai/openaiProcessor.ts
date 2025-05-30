@@ -77,6 +77,14 @@ IMPORTANT TIMING EXTRACTION GUIDELINES:
 - Look for patterns like "9:00 am - 9:00 pm", "10:00 am - 6:00 pm", etc.
 - If opening hours are provided (like for attractions), use those as the event times
 
+LOCATION EXTRACTION GUIDELINES:
+- If multiple locations are mentioned, use the FIRST location only
+- Include the full address if available, including the venue name
+- Singapore postal codes are 5 digits (like, Singapore 02315)
+- If a Singapore postal code is present, ALWAYS include it in the location string
+- Format: "Venue Name, Street Address, Singapore Postal Code" (e.g., "Marina Bay Sands, 10 Bayfront Avenue, Singapore 018956")
+- The postal code is crucial for accurate coordinate mapping
+
 FALLBACK DATE EXTRACTION:
 - If no specific event start date is found in the content, look for the article publication date
 - The publication date usually appears in this format in the markdown:
@@ -97,7 +105,6 @@ Other guidelines:
 - If they state duration of date (like "from now till 31 Aug"), state the date to be "Now - 31 Aug 2025"
 - If no specific date is found AND no publication date can be extracted, return null for the date
 - If no specific time is found, return null for the time
-- For location, include the full address if available, otherwise just the venue name and city
 - Keep descriptions concise but informative
 - Choose the most appropriate category ID number from the list above
 
@@ -210,9 +217,51 @@ ${markdown}`;
 
   private async getCoordinates(location: string): Promise<{ x: number; y: number } | undefined> {
     try {
-      // Use a simple geocoding approach - in production, you might want to use a proper geocoding service
-      const geocodingPrompt = `Convert this location to latitude and longitude coordinates: "${location}"
+      // Extract postal code from location if present
+      const postalCodeMatch = location.match(/\b5\d{5}\b/);
+      const searchQuery = postalCodeMatch ? postalCodeMatch[0] : location;
+
+      // Use Singapore's OneMap API for accurate geocoding
+      const response = await fetch(
+        `https://www.onemap.gov.sg/api/common/elastic/search?searchVal=${encodeURIComponent(searchQuery)}&returnGeom=Y&getAddrDetails=Y`
+      );
+
+      if (!response.ok) {
+        throw new Error('OneMap API request failed');
+      }
+
+      const data = await response.json();
       
+      if (data.found > 0 && data.results && data.results.length > 0) {
+        const result = data.results[0];
+        return {
+          x: parseFloat(result.LONGITUDE),
+          y: parseFloat(result.LATITUDE)
+        };
+      }
+
+      // Fallback: if OneMap fails, try basic coordinate extraction from AI
+      console.warn('OneMap geocoding failed, falling back to AI geocoding');
+      return await this.fallbackAIGeocoding(location);
+
+    } catch (error) {
+      console.warn('OneMap geocoding failed:', error);
+      // Fallback to AI geocoding
+      return await this.fallbackAIGeocoding(location);
+    }
+  }
+
+  private async fallbackAIGeocoding(location: string): Promise<{ x: number; y: number } | undefined> {
+    try {
+      // Use a simple geocoding approach - in production, you might want to use a proper geocoding service
+      const geocodingPrompt = `Convert this Singapore location to latitude and longitude coordinates: "${location}"
+      
+IMPORTANT GUIDELINES:
+- Singapore postal codes are 5 digits (like, Singapore 02315)
+- If a postal code is present in the location, use it as the primary reference for accurate coordinates
+- Singapore coordinates typically range: Latitude 1.1° to 1.5°N, Longitude 103.6° to 104.0°E
+- Be as precise as possible when postal codes are provided
+
 Return only a JSON object with the coordinates:
 {
   "latitude": number,
