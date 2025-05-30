@@ -77,6 +77,17 @@ IMPORTANT TIMING EXTRACTION GUIDELINES:
 - Look for patterns like "9:00 am - 9:00 pm", "10:00 am - 6:00 pm", etc.
 - If opening hours are provided (like for attractions), use those as the event times
 
+DAY RANGE FORMATTING FOR TIMES:
+- When consecutive days are listed with the same hours (e.g., "Mon - Tue - Wed, 9am - 9pm"), format as a range
+- Use format: "Mon - Wed: 9:00am - 9:00pm" instead of listing all individual days
+- For non-consecutive days, list them separately (e.g., "Mon, Wed, Fri: 9:00am - 9:00pm")
+- Always use proper time formatting with AM/PM (e.g., "9:00am" not "9am")
+- Examples:
+  * "Mon - Tue - Wed, 9am - 9pm" → "Mon - Wed: 9:00am - 9:00pm"
+  * "Monday to Friday, 10am - 6pm" → "Mon - Fri: 10:00am - 6:00pm"
+  * "Weekdays 9am - 5pm" → "Mon - Fri: 9:00am - 5:00pm"
+  * "Weekends 10am - 6pm" → "Sat - Sun: 10:00am - 6:00pm"
+
 LOCATION EXTRACTION GUIDELINES:
 - If multiple locations are mentioned, use the FIRST location only
 - Include the full address if available, including the venue name

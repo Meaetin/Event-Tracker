@@ -64,7 +64,7 @@ export default function Navigation() {
           <div className="flex">
             <div className="flex-shrink-0 flex items-center">
               <Link href="/" className="text-xl font-bold text-blue-600">
-                Event Map App
+                EventScapeSG
               </Link>
             </div>
             <div className="ml-6 flex items-center space-x-4">
@@ -85,6 +85,17 @@ export default function Navigation() {
               >
                 Events Map
               </Link>
+              
+              {/* AI Event Planning - Coming Soon */}
+              <span className="px-3 py-2 rounded-md text-sm font-medium text-gray-400 cursor-not-allowed relative group">
+                AI Event Planning
+                <span className="ml-2 text-xs bg-gray-200 text-gray-600 px-2 py-1 rounded-full">
+                  Coming Soon
+                </span>
+                <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 px-2 py-1 bg-gray-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                  AI-powered itinerary planning
+                </div>
+              </span>
               
               {authUser && (
                 <>

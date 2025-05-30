@@ -195,8 +195,8 @@ export default function AdminDashboard() {
 
       const listings = (data as ScrapedEventListing[]) || [];
       setScrapedListings(listings);
-      // Show all listings except rejected ones
-      setDisplayedListings(listings.filter(l => l.status !== 'rejected'));
+      // Show all listings except rejected and processed ones
+      setDisplayedListings(listings.filter(l => l.status !== 'rejected' && l.status !== 'processed'));
     } catch (err: any) {
       console.error('Error fetching scraped listings:', err);
       setError(`Failed to load scraped listings: ${err.message}`);
@@ -279,7 +279,7 @@ export default function AdminDashboard() {
                 .from('scraped_listings')
                 .upsert(upsertData, { 
                   onConflict: 'url',
-                  ignoreDuplicates: false 
+                  ignoreDuplicates: true 
                 })
                 .select();
               return result;
@@ -443,7 +443,7 @@ export default function AdminDashboard() {
             .from('scraped_listings')
             .upsert(upsertData, { 
               onConflict: 'url',
-              ignoreDuplicates: false 
+              ignoreDuplicates: true 
             })
             .select();
           return result;
