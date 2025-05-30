@@ -1,4 +1,4 @@
-## Name (TBD)
+## EventScape Singapore
 
 Don't know where to go this weekend?
 Too lazy to find what events are happening?
