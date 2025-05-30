@@ -1091,7 +1091,7 @@ export default function AdminDashboard() {
                               <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
                               </svg>
-                              <span className="font-medium">Category:</span> {event.categories?.name || 'Uncategorized'}
+                              <span className="font-medium">Category:</span> {Array.isArray(event.categories) ? event.categories[0]?.name || 'Uncategorized' : event.categories?.name || 'Uncategorized'}
                             </span>
                           </p>
                         </div>
@@ -1164,7 +1164,7 @@ export default function AdminDashboard() {
                             
                             <div>
                               <label className="text-sm font-medium text-gray-700">Category:</label>
-                              <p className="text-sm text-gray-900 mt-1">{event.categories?.name || 'Uncategorized'}</p>
+                              <p className="text-sm text-gray-900 mt-1">{Array.isArray(event.categories) ? event.categories[0]?.name || 'Uncategorized' : event.categories?.name || 'Uncategorized'}</p>
                             </div>
                           </div>
                         </div>
@@ -1355,7 +1355,7 @@ export default function AdminDashboard() {
                           <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
                           </svg>
-                          <span className="font-medium">Category:</span> {event.categories?.name || 'Uncategorized'}
+                          <span className="font-medium">Category:</span> {Array.isArray(event.categories) ? event.categories[0]?.name || 'Uncategorized' : event.categories?.name || 'Uncategorized'}
                         </span>
                       </p>
                     </div>

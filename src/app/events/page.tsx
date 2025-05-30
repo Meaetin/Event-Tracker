@@ -22,7 +22,8 @@ const EventsMap = dynamic(() => import('../components/map/EventsMap'), {
 
 export default function EventsPage() {
   const [selectedEvent, setSelectedEvent] = useState<MapEvent | null>(null);
-  const [selectedCategory, setSelectedCategory] = useState<string>('');
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [showPermanentStores, setShowPermanentStores] = useState(true);
   const mapRef = useRef<any>(null);
 
   const handleEventSelect = useCallback((event: MapEvent) => {
@@ -34,11 +35,19 @@ export default function EventsPage() {
     }
   }, []);
 
-  const handleCategoryChange = useCallback((categoryId: string) => {
-    setSelectedCategory(categoryId);
+  const handleCategoryChange = useCallback((categoryIds: string[]) => {
+    setSelectedCategories(categoryIds);
     // Clear selected event when category changes to avoid confusion
     setSelectedEvent(null);
   }, []);
+
+  const handlePermanentStoresChange = useCallback((show: boolean) => {
+    setShowPermanentStores(show);
+    // Clear selected event if it's a permanent store and we're hiding them
+    if (!show && selectedEvent?.store_type === 'permanent_store') {
+      setSelectedEvent(null);
+    }
+  }, [selectedEvent]);
 
   const handleMapRef = useCallback((ref: any) => {
     mapRef.current = ref;
@@ -86,7 +95,9 @@ export default function EventsPage() {
             onEventSelect={handleEventSelect}
             selectedEventId={selectedEvent?.id || null}
             onCategoryChange={handleCategoryChange}
-            selectedCategory={selectedCategory}
+            selectedCategories={selectedCategories}
+            showPermanentStores={showPermanentStores}
+            onPermanentStoresChange={handlePermanentStoresChange}
           />
         </Suspense>
 
@@ -103,7 +114,8 @@ export default function EventsPage() {
             <EventsMap 
               ref={handleMapRef}
               selectedEventId={selectedEvent?.id || null}
-              selectedCategory={selectedCategory}
+              selectedCategories={selectedCategories}
+              showPermanentStores={showPermanentStores}
               center={selectedEvent?.coordinates ? 
                 [selectedEvent.coordinates.latitude, selectedEvent.coordinates.longitude] : 
                 undefined

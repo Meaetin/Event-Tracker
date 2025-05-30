@@ -6,31 +6,40 @@ import { MapEvent, EventsApiResponse, Category, CategoriesApiResponse } from '..
 interface EventSidebarProps {
   onEventSelect?: (event: MapEvent) => void;
   selectedEventId?: string | null;
-  onCategoryChange?: (categoryId: string) => void;
-  selectedCategory?: string;
+  onCategoryChange?: (categoryIds: string[]) => void;
+  selectedCategories?: string[];
+  showPermanentStores?: boolean;
+  onPermanentStoresChange?: (show: boolean) => void;
 }
 
-export default function EventSidebar({ onEventSelect, selectedEventId, onCategoryChange, selectedCategory: propSelectedCategory }: EventSidebarProps) {
+export default function EventSidebar({ 
+  onEventSelect, 
+  selectedEventId, 
+  onCategoryChange, 
+  selectedCategories: propSelectedCategories,
+  showPermanentStores: propShowPermanentStores = true,
+  onPermanentStoresChange
+}: EventSidebarProps) {
   const [events, setEvents] = useState<MapEvent[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
   // Filters
-  const [selectedCategory, setSelectedCategory] = useState<string>(propSelectedCategory || '');
+  const [selectedCategories, setSelectedCategories] = useState<string[]>(propSelectedCategories || []);
   const [searchQuery, setSearchQuery] = useState('');
-  const [dateFilter, setDateFilter] = useState<'all' | 'today' | 'week' | 'month'>('all');
+  const showPermanentStores = propShowPermanentStores;
 
   useEffect(() => {
     fetchData();
   }, []);
 
-  // Sync selectedCategory with prop
+  // Sync selectedCategories with prop
   useEffect(() => {
-    if (propSelectedCategory !== undefined) {
-      setSelectedCategory(propSelectedCategory);
+    if (propSelectedCategories !== undefined) {
+      setSelectedCategories(propSelectedCategories);
     }
-  }, [propSelectedCategory]);
+  }, [propSelectedCategories]);
 
   const fetchData = async () => {
     try {
@@ -102,64 +111,14 @@ export default function EventSidebar({ onEventSelect, selectedEventId, onCategor
     return text.substring(0, maxLength) + '...';
   };
 
-  // Helper function to safely parse date strings
-  const parseEventDate = (dateString: string | null): Date | null => {
-    if (!dateString || dateString.trim() === '') {
-      return null;
-    }
-
-    try {
-      // Handle YYYY-MM-DD format (database format)
-      if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
-        // Parse as local date to avoid timezone issues
-        const [year, month, day] = dateString.split('-').map(Number);
-        return new Date(year, month - 1, day); // month is 0-indexed
-      }
-
-      // Try parsing as-is for other formats
-      const date = new Date(dateString);
-      
-      // Check if the date is valid
-      if (isNaN(date.getTime())) {
-        console.warn(`Invalid date format: "${dateString}"`);
-        return null;
-      }
-
-      return date;
-    } catch (error) {
-      console.warn(`Error parsing date "${dateString}":`, error);
-      return null;
-    }
-  };
-
-  const getDateFilterRange = () => {
-    const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    
-    switch (dateFilter) {
-      case 'today':
-        return {
-          start: today,
-          end: new Date(today.getTime() + 24 * 60 * 60 * 1000)
-        };
-      case 'week':
-        return {
-          start: today,
-          end: new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000)
-        };
-      case 'month':
-        return {
-          start: today,
-          end: new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000)
-        };
-      default:
-        return null;
-    }
-  };
-
   const filteredEvents = events.filter(event => {
+    // Permanent stores filter
+    if (!showPermanentStores && event.store_type === 'permanent_store') {
+      return false;
+    }
+
     // Category filter
-    if (selectedCategory && event.category_id?.toString() !== selectedCategory) {
+    if (selectedCategories.length > 0 && !selectedCategories.includes(event.category_id?.toString() || '')) {
       return false;
     }
 
@@ -175,58 +134,34 @@ export default function EventSidebar({ onEventSelect, selectedEventId, onCategor
       }
     }
 
-    // Enhanced date filter with proper text date handling
-    if (dateFilter !== 'all') {
-      const range = getDateFilterRange();
-      if (range) {
-        // Parse the event's start date
-        const eventStartDate = parseEventDate(event.start_date);
-        
-        if (!eventStartDate) {
-          // If we can't parse the start date, exclude it from date-filtered results
-          return false;
-        }
-
-        // Check if event starts within the range
-        const eventStartsInRange = eventStartDate >= range.start && eventStartDate < range.end;
-        
-        // If there's an end date, also check if the event is ongoing during the range
-        let eventOngoingInRange = false;
-        if (event.end_date) {
-          const eventEndDate = parseEventDate(event.end_date);
-          if (eventEndDate) {
-            // Event is ongoing if it starts before range end and ends after range start
-            eventOngoingInRange = eventStartDate < range.end && eventEndDate >= range.start;
-          }
-        }
-
-        // Include event if it starts in range OR is ongoing during the range
-        if (!eventStartsInRange && !eventOngoingInRange) {
-          return false;
-        }
-      }
-    }
-
     return true;
   });
 
-  // Sort filtered events by date (earliest first)
+  // Sort filtered events by date (earliest first) - simplified sorting
   const sortedEvents = [...filteredEvents].sort((a, b) => {
-    const dateA = parseEventDate(a.start_date);
-    const dateB = parseEventDate(b.start_date);
-    
     // Handle null dates - put them at the end
-    if (!dateA && !dateB) return 0;
-    if (!dateA) return 1;
-    if (!dateB) return -1;
+    if (!a.start_date && !b.start_date) return 0;
+    if (!a.start_date) return 1;
+    if (!b.start_date) return -1;
     
-    // Compare valid dates
-    return dateA.getTime() - dateB.getTime();
+    // Simple string comparison for dates
+    return a.start_date.localeCompare(b.start_date);
   });
 
   const handleEventClick = (event: MapEvent) => {
     if (onEventSelect) {
       onEventSelect(event);
+    }
+  };
+
+  const handleCategoryToggle = (categoryId: string) => {
+    const updatedCategories = selectedCategories.includes(categoryId)
+      ? selectedCategories.filter(id => id !== categoryId)
+      : [...selectedCategories, categoryId];
+    
+    setSelectedCategories(updatedCategories);
+    if (onCategoryChange) {
+      onCategoryChange(updatedCategories);
     }
   };
 
@@ -282,39 +217,66 @@ export default function EventSidebar({ onEventSelect, selectedEventId, onCategor
 
         {/* Filters */}
         <div className="space-y-3">
-          {/* Category Filter */}
+          {/* Event Type Filter */}
           <div>
-            <select
-              value={selectedCategory}
-              onChange={(e) => {
-                setSelectedCategory(e.target.value);
-                if (onCategoryChange) {
-                  onCategoryChange(e.target.value);
-                }
-              }}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              <option value="">All Categories</option>
-              {categories.map(category => (
-                <option key={category.id} value={category.id.toString()}>
-                  {category.name}
-                </option>
-              ))}
-            </select>
+            <div className="text-sm font-medium text-gray-700 mb-2">Event Types</div>
+            <div className="space-y-2">
+              <label className="flex items-center cursor-pointer hover:bg-gray-50 p-1 rounded">
+                <input
+                  type="checkbox"
+                  checked={showPermanentStores}
+                  onChange={(e) => {
+                    if (onPermanentStoresChange) {
+                      onPermanentStoresChange(e.target.checked);
+                    }
+                  }}
+                  className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                />
+                <span className="ml-2 text-sm text-gray-700">Show permanent stores</span>
+              </label>
+            </div>
           </div>
 
-          {/* Date Filter */}
+          {/* Category Filter */}
           <div>
-            <select
-              value={dateFilter}
-              onChange={(e) => setDateFilter(e.target.value as any)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              <option value="all">All Dates</option>
-              <option value="today">Today</option>
-              <option value="week">This Week</option>
-              <option value="month">This Month</option>
-            </select>
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-sm font-medium text-gray-700">Categories</div>
+              <button
+                onClick={() => {
+                  setSelectedCategories([]);
+                  if (onCategoryChange) {
+                    onCategoryChange([]);
+                  }
+                }}
+                disabled={selectedCategories.length === 0}
+                className={`text-xs px-2 py-1 rounded transition-colors ${
+                  selectedCategories.length === 0
+                    ? 'text-gray-400 cursor-not-allowed'
+                    : 'text-gray-600 hover:text-gray-800 hover:bg-gray-100'
+                }`}
+                title="Reset category filters"
+              >
+                Reset
+              </button>
+            </div>
+            <div className="max-h-40 overflow-y-auto border border-gray-200 rounded-md p-2 space-y-1">
+              {categories.map(category => (
+                <label key={category.id} className="flex items-center cursor-pointer hover:bg-gray-50 p-1 rounded">
+                  <input
+                    type="checkbox"
+                    checked={selectedCategories.includes(category.id.toString())}
+                    onChange={() => handleCategoryToggle(category.id.toString())}
+                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  />
+                  <span className="ml-2 text-sm text-gray-700">{category.name}</span>
+                </label>
+              ))}
+            </div>
+            {selectedCategories.length > 0 && (
+              <div className="mt-2 text-xs text-gray-600">
+                {selectedCategories.length} filter{selectedCategories.length !== 1 ? 's' : ''} applied
+              </div>
+            )}
           </div>
         </div>
 
@@ -401,7 +363,7 @@ export default function EventSidebar({ onEventSelect, selectedEventId, onCategor
                   {/* Category */}
                   {event.categories && (
                     <span className="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">
-                      {event.categories.name}
+                      {Array.isArray(event.categories) ? event.categories[0]?.name : event.categories.name}
                     </span>
                   )}
                   

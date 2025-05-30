@@ -25,6 +25,8 @@ export async function GET(request: NextRequest) {
         coordinates,
         description,
         category_id,
+        category_ids,
+        store_type,
         status,
         images,
         created_at,

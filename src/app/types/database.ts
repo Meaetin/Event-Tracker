@@ -25,13 +25,14 @@ export interface Event {
     location: string;
     coordinates: string | null;  // PostgreSQL point format: "(longitude,latitude)"
     description: string | null;
-    category_id: number | null;
+    category_id: number | null;  // Legacy single category support
+    category_ids?: number[];  // Multiple categories support
     store_type: 'event' | 'permanent_store';  // NEW: Classification field
     status: EventStatus;
     images: string[];
     created_at: string;
     updated_at: string;
-    categories?: Category;  // Optional category relation
+    categories?: Category | Category[];  // Optional category relation - can be single or multiple
 }
 
 // Map-specific types

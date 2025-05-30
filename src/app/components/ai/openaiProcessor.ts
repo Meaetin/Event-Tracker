@@ -256,10 +256,22 @@ ${markdown}`;
         processedDate = parsedResponse.date.toString().trim();
       }
 
+      // Special handling for permanent stores without opening dates
+      if (!processedDate && parsedResponse.store_type === 'permanent_store') {
+        processedDate = "Now Open";
+        console.log(`Set date to "Now Open" for permanent store: ${parsedResponse.name}`);
+      }
+
       // Handle time field - can be string or null
       let processedTime = null;
       if (parsedResponse.time && parsedResponse.time !== null && parsedResponse.time !== "null") {
         processedTime = parsedResponse.time.toString().trim();
+      }
+
+      // Special handling for events/stores without specific times
+      if (!processedTime) {
+        processedTime = "Check website for opening hours";
+        console.log(`Set time to "Check website for opening hours" for: ${parsedResponse.name}`);
       }
 
       // Try to get coordinates for the location
@@ -299,58 +311,199 @@ ${markdown}`;
     try {
       // Extract postal code from location if present
       const postalCodeMatch = location.match(/\b5\d{5}\b/);
-      const searchQuery = postalCodeMatch ? postalCodeMatch[0] : location;
-
-      // Use Singapore's OneMap API for accurate geocoding
-      const response = await fetch(
-        `https://www.onemap.gov.sg/api/common/elastic/search?searchVal=${encodeURIComponent(searchQuery)}&returnGeom=Y&getAddrDetails=Y`
-      );
-
-      if (!response.ok) {
-        throw new Error('OneMap API request failed');
-      }
-
-      const data = await response.json();
       
-      if (data.found > 0 && data.results && data.results.length > 0) {
-        const result = data.results[0];
-        return {
-          x: parseFloat(result.LONGITUDE),
-          y: parseFloat(result.LATITUDE)
-        };
+      if (postalCodeMatch) {
+        // If postal code found, use OneMap API
+        console.log(`Using OneMap API for postal code: ${postalCodeMatch[0]}`);
+        const searchQuery = postalCodeMatch[0];
+
+        const response = await fetch(
+          `https://www.onemap.gov.sg/api/common/elastic/search?searchVal=${encodeURIComponent(searchQuery)}&returnGeom=Y&getAddrDetails=Y`
+        );
+
+        if (!response.ok) {
+          throw new Error('OneMap API request failed');
+        }
+
+        const data = await response.json();
+        
+        if (data.found > 0 && data.results && data.results.length > 0) {
+          const result = data.results[0];
+          console.log(`OneMap coordinates found: ${result.LATITUDE}, ${result.LONGITUDE}`);
+          return {
+            x: parseFloat(result.LONGITUDE),
+            y: parseFloat(result.LATITUDE)
+          };
+        }
       }
 
-      // Fallback: if OneMap fails, try basic coordinate extraction from AI
-      console.warn('OneMap geocoding failed, falling back to AI geocoding');
+      // No postal code or OneMap failed, try online geocoding with location name
+      console.log(`No postal code found or OneMap failed, trying online geocoding for: ${location}`);
+      const onlineCoords = await this.onlineGeocoding(location);
+      if (onlineCoords) {
+        return onlineCoords;
+      }
+
+      // Final fallback: AI geocoding
+      console.warn('Online geocoding failed, falling back to AI geocoding');
       return await this.fallbackAIGeocoding(location);
 
     } catch (error) {
-      console.warn('OneMap geocoding failed:', error);
-      // Fallback to AI geocoding
+      console.warn('Coordinate lookup failed:', error);
+      // Try online geocoding as backup
+      try {
+        const onlineCoords = await this.onlineGeocoding(location);
+        if (onlineCoords) {
+          return onlineCoords;
+        }
+      } catch (onlineError) {
+        console.warn('Online geocoding backup failed:', onlineError);
+      }
+      
+      // Final fallback to AI geocoding
       return await this.fallbackAIGeocoding(location);
     }
   }
 
+  private async onlineGeocoding(location: string): Promise<{ x: number; y: number } | undefined> {
+    try {
+      // Clean the location string for better geocoding results
+      const cleanLocation = this.cleanLocationForGeocoding(location);
+      console.log(`Attempting online geocoding for: ${cleanLocation}`);
+
+      // Use Nominatim (OpenStreetMap) geocoding service - free and reliable
+      const nominatimUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(cleanLocation)}&countrycodes=sg&limit=1&addressdetails=1`;
+      
+      const response = await fetch(nominatimUrl, {
+        headers: {
+          'User-Agent': 'EventScapeSG/1.0 (https://eventscape.sg)'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Nominatim API error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      
+      if (data && data.length > 0) {
+        const result = data[0];
+        const latitude = parseFloat(result.lat);
+        const longitude = parseFloat(result.lon);
+        
+        // Validate that coordinates are within Singapore bounds
+        if (this.isValidSingaporeCoordinate(latitude, longitude)) {
+          console.log(`Online geocoding successful: ${latitude}, ${longitude}`);
+          return {
+            x: longitude,
+            y: latitude
+          };
+        } else {
+          console.warn(`Coordinates outside Singapore bounds: ${latitude}, ${longitude}`);
+        }
+      }
+
+      // If Nominatim fails, try a secondary approach with more specific search
+      if (location.toLowerCase().includes('singapore')) {
+        const secondaryUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(location)}&countrycodes=sg&limit=3&addressdetails=1`;
+        
+        const secondaryResponse = await fetch(secondaryUrl, {
+          headers: {
+            'User-Agent': 'EventScapeSG/1.0 (https://eventscape.sg)'
+          }
+        });
+
+        if (secondaryResponse.ok) {
+          const secondaryData = await secondaryResponse.json();
+          
+          for (const result of secondaryData) {
+            const latitude = parseFloat(result.lat);
+            const longitude = parseFloat(result.lon);
+            
+            if (this.isValidSingaporeCoordinate(latitude, longitude)) {
+              console.log(`Secondary online geocoding successful: ${latitude}, ${longitude}`);
+              return {
+                x: longitude,
+                y: latitude
+              };
+            }
+          }
+        }
+      }
+
+      console.warn('Online geocoding found no valid results');
+      return undefined;
+
+    } catch (error) {
+      console.warn('Online geocoding error:', error);
+      return undefined;
+    }
+  }
+
+  private cleanLocationForGeocoding(location: string): string {
+    // Clean and optimize the location string for better geocoding results
+    let cleaned = location.trim();
+    
+    // If location doesn't end with Singapore, add it
+    if (!cleaned.toLowerCase().includes('singapore')) {
+      cleaned += ', Singapore';
+    }
+    
+    // Remove common noise words that might confuse geocoding
+    cleaned = cleaned.replace(/\b(Level \d+|#\d+-\d+|Unit \d+)\b/gi, '');
+    
+    // Clean up extra spaces and punctuation
+    cleaned = cleaned.replace(/\s+/g, ' ').trim();
+    cleaned = cleaned.replace(/,\s*,/g, ','); // Remove double commas
+    
+    return cleaned;
+  }
+
+  private isValidSingaporeCoordinate(latitude: number, longitude: number): boolean {
+    // Singapore bounds: approximately 1.1°N to 1.5°N, 103.6°E to 104.0°E
+    return (
+      latitude >= 1.1 && latitude <= 1.5 &&
+      longitude >= 103.6 && longitude <= 104.0
+    );
+  }
+
   private async fallbackAIGeocoding(location: string): Promise<{ x: number; y: number } | undefined> {
     try {
-      // Use a simple geocoding approach - in production, you might want to use a proper geocoding service
-      const geocodingPrompt = `Convert this Singapore location to latitude and longitude coordinates: "${location}"
-      
-IMPORTANT GUIDELINES:
-- Singapore postal codes are 5 digits (like, Singapore 02315)
-- If a postal code is present in the location, use it as the primary reference for accurate coordinates
-- Singapore coordinates typically range: Latitude 1.1° to 1.5°N, Longitude 103.6° to 104.0°E
-- Be as precise as possible when postal codes are provided
+      // Enhanced AI geocoding with better instructions
+      const geocodingPrompt = `You are a geocoding expert for Singapore locations. Convert this Singapore location to precise latitude and longitude coordinates: "${location}"
 
-Return only a JSON object with the coordinates:
+ENHANCED GEOCODING GUIDELINES:
+- Search your knowledge for the exact coordinates of this Singapore location
+- If it's a well-known venue (like Superpark Suntec City), use your knowledge of its precise location
+- Singapore postal codes are 5 digits starting with 5 (e.g., 568956)
+- Singapore coordinates: Latitude 1.1° to 1.5°N, Longitude 103.6° to 104.0°E
+- Common Singapore landmarks:
+  * Marina Bay Sands: 1.2834, 103.8607
+  * Orchard Road: 1.3048, 103.8318  
+  * Sentosa Island: 1.2494, 103.8303
+  * Jurong East: 1.3329, 103.7436
+  * Changi Airport: 1.3644, 103.9915
+- For shopping malls, use the main building coordinates
+- For specific venues within complexes, use the complex's main coordinates
+- Be as precise as possible - use 4-6 decimal places
+
+LOCATION ANALYSIS:
+1. Identify the main venue/building name
+2. Identify the area/district if mentioned
+3. Use your knowledge of Singapore geography
+4. Provide coordinates with high confidence
+
+Return only a JSON object with precise coordinates:
 {
   "latitude": number,
-  "longitude": number
+  "longitude": number,
+  "confidence": "high" | "medium" | "low",
+  "reasoning": "Brief explanation of how you determined these coordinates"
 }
 
-If you cannot determine the coordinates, return:
+If you cannot determine the coordinates with reasonable confidence, return:
 {
-  "error": "Could not determine coordinates"
+  "error": "Could not determine coordinates with sufficient confidence"
 }`;
 
       const completion = await this.openai.chat.completions.create({
@@ -359,7 +512,7 @@ If you cannot determine the coordinates, return:
           { role: 'user', content: geocodingPrompt }
         ],
         temperature: 0.1,
-        max_tokens: 200,
+        max_tokens: 300,
         response_format: { type: 'json_object' }
       });
 
@@ -371,7 +524,19 @@ If you cannot determine the coordinates, return:
       const parsedResponse = JSON.parse(response);
       
       if (parsedResponse.error || !parsedResponse.latitude || !parsedResponse.longitude) {
+        console.warn('AI geocoding failed:', parsedResponse.error || 'No coordinates returned');
         return undefined;
+      }
+
+      // Validate Singapore bounds
+      if (!this.isValidSingaporeCoordinate(parsedResponse.latitude, parsedResponse.longitude)) {
+        console.warn(`AI geocoding returned coordinates outside Singapore: ${parsedResponse.latitude}, ${parsedResponse.longitude}`);
+        return undefined;
+      }
+
+      console.log(`AI geocoding successful: ${parsedResponse.latitude}, ${parsedResponse.longitude} (${parsedResponse.confidence} confidence)`);
+      if (parsedResponse.reasoning) {
+        console.log(`AI reasoning: ${parsedResponse.reasoning}`);
       }
 
       return {
@@ -380,7 +545,7 @@ If you cannot determine the coordinates, return:
       };
 
     } catch (error) {
-      console.warn('Geocoding failed:', error);
+      console.warn('AI geocoding failed:', error);
       return undefined;
     }
   }

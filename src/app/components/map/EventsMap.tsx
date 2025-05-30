@@ -23,7 +23,8 @@ interface EventsMapProps {
   center?: LatLngExpression;
   zoom?: number;
   selectedEventId?: string | null;
-  selectedCategory?: string;
+  selectedCategories?: string[];
+  showPermanentStores?: boolean;
 }
 
 export interface EventsMapRef {
@@ -35,11 +36,13 @@ const EventsMap = forwardRef<EventsMapRef, EventsMapProps>(({
   center = defaultPosition, 
   zoom = 11,
   selectedEventId,
-  selectedCategory 
+  selectedCategories,
+  showPermanentStores
 }, ref) => {
   const [events, setEvents] = useState<MapEvent[]>(propEvents || []);
   const [loading, setLoading] = useState(!propEvents);
   const [error, setError] = useState<string | null>(null);
+  const [categories, setCategories] = useState<{ [key: number]: string }>({});
   const mapRef = useRef<any>(null);
   const markersRef = useRef<{ [key: string]: any }>({});
 
@@ -66,6 +69,29 @@ const EventsMap = forwardRef<EventsMapRef, EventsMapProps>(({
       fetchEvents();
     }
   }, [propEvents]);
+
+  // Fetch categories for lookup
+  useEffect(() => {
+    fetchCategories();
+  }, []);
+
+  const fetchCategories = async () => {
+    try {
+      const response = await fetch('/api/events/categories');
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          const categoryMap: { [key: number]: string } = {};
+          data.categories.forEach((cat: any) => {
+            categoryMap[cat.id] = cat.name;
+          });
+          setCategories(categoryMap);
+        }
+      }
+    } catch (error) {
+      console.warn('Failed to fetch categories:', error);
+    }
+  };
 
   // Handle selected event changes
   useEffect(() => {
@@ -166,9 +192,14 @@ const EventsMap = forwardRef<EventsMapRef, EventsMapProps>(({
       return false;
     }
     
+    // Permanent stores filter
+    if (showPermanentStores === false && event.store_type === 'permanent_store') {
+      return false;
+    }
+    
     // Then check category filter
-    if (selectedCategory && selectedCategory !== '') {
-      return event.category_id?.toString() === selectedCategory;
+    if (selectedCategories && selectedCategories.length > 0) {
+      return selectedCategories.includes(event.category_id?.toString() || '');
     }
     
     return true;
@@ -275,22 +306,67 @@ const EventsMap = forwardRef<EventsMapRef, EventsMapProps>(({
                   </div>
                 )}
                 
-                {/* Bottom section with Category and Event URL */}
+                {/* Bottom section with Categories and Event URL */}
                 <div className="pt-1 border-t border-gray-200">
-                  <div className="flex items-center justify-between">
-                    {/* Category */}
-                    {event.categories && (
-                      <span className="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-0.5 rounded-full">
-                        {event.categories.name}
-                      </span>
-                    )}
+                  <div className="flex items-start justify-between gap-2">
+                    {/* Categories - Updated to handle multiple categories */}
+                    <div className="flex-1">
+                      {/* Multiple categories support (priority) */}
+                      {event.category_ids && event.category_ids.length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {event.category_ids.slice(0, 3).map((categoryId: number, index: number) => {
+                            const categoryName = categories[categoryId] || `Category ${categoryId}`;
+                            
+                            // Debug logging for development
+                            if (process.env.NODE_ENV === 'development' && index === 0) {
+                              console.log('Event categories debug:', {
+                                eventName: event.name,
+                                category_ids: event.category_ids,
+                                categories: event.categories,
+                                category_id: event.category_id,
+                                categoriesLookup: categories
+                              });
+                            }
+                            
+                            return (
+                              <span 
+                                key={`category-${categoryId}-${index}`}
+                                className="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-0.5 rounded-full"
+                              >
+                                {categoryName}
+                              </span>
+                            );
+                          })}
+                          {event.category_ids.length > 3 && (
+                            <span className="inline-block bg-gray-100 text-gray-600 text-xs px-2 py-0.5 rounded-full">
+                              +{event.category_ids.length - 3} more
+                            </span>
+                          )}
+                        </div>
+                      ) : event.categories ? (
+                        /* Single category fallback */
+                        <span className="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-0.5 rounded-full">
+                          {Array.isArray(event.categories) ? event.categories[0]?.name : event.categories.name}
+                        </span>
+                      ) : event.category_id && categories[event.category_id] ? (
+                        /* Legacy category_id support */
+                        <span className="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-0.5 rounded-full">
+                          {categories[event.category_id]}
+                        </span>
+                      ) : (
+                        /* No categories available */
+                        <span className="inline-block bg-gray-100 text-gray-600 text-xs px-2 py-0.5 rounded-full">
+                          Uncategorized
+                        </span>
+                      )}
+                    </div>
                     
                     {/* Event URL */}
                     <a 
                       href={event.url} 
                       target="_blank" 
                       rel="noopener noreferrer"
-                      className="inline-flex items-center text-blue-600 hover:text-blue-800 text-xs font-medium"
+                      className="inline-flex items-center text-blue-600 hover:text-blue-800 text-xs font-medium flex-shrink-0"
                     >
                       <span>View Details</span>
                       <svg className="w-3 h-3 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
