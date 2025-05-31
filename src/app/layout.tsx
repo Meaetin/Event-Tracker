@@ -31,7 +31,7 @@ export default function RootLayout({
         <AuthProvider>
           <Suspense fallback={<LoadingSpinner />}>
             <Navigation />
-            <main className="container mx-auto px-4 py-8">
+            <main>
               {children}
             </main>
           </Suspense>
