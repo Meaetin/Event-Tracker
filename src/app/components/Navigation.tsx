@@ -10,7 +10,12 @@ export default function Navigation() {
   const { user: authUser, isLoading: authLoading, signOut } = useAuth();
   const [role, setRole] = useState<string | null>('user'); // Default to user role
   const [loading, setLoading] = useState(false); // Set to false to avoid loading state
+  const [mounted, setMounted] = useState(false);
   const pathname = usePathname();
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     async function getUserRole() {
@@ -41,10 +46,10 @@ export default function Navigation() {
       }
     }
     
-    if (!authLoading) {
+    if (!authLoading && mounted) {
       getUserRole();
     }
-  }, [authUser, authLoading]);
+  }, [authUser, authLoading, mounted]);
 
   const handleSignOut = async () => {
     await signOut();
@@ -53,10 +58,7 @@ export default function Navigation() {
 
   const isActive = (path: string) => pathname === path;
 
-  if (authLoading) {
-    return <div className="h-16 bg-white shadow"></div>;
-  }
-
+  // Always render the nav structure to prevent hydration mismatch
   return (
     <nav className="bg-white shadow">
       <div className="container mx-auto px-4">
@@ -97,7 +99,7 @@ export default function Navigation() {
                 </div>
               </span>
               
-              {authUser && (
+              {mounted && authUser && (
                 <>
                   {role === 'admin' ? (
                     <Link 
@@ -124,14 +126,14 @@ export default function Navigation() {
           </div>
           
           <div className="flex items-center">
-            {authUser ? (
+            {mounted && authUser ? (
               <button
                 onClick={handleSignOut}
                 className="ml-4 px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100"
               >
                 Sign Out
               </button>
-            ) : (
+            ) : mounted && (
               <div className="space-x-2">
                 <Link 
                   href="/auth/login" 
