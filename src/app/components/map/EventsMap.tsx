@@ -207,6 +207,18 @@ const EventsMap = forwardRef<EventsMapRef, EventsMapProps>(({
     return text.substring(0, maxLength) + '...';
   };
 
+  // Function to generate Google Maps URL
+  const getGoogleMapsUrl = (event: MapEvent) => {
+    if (event.coordinates) {
+      const { latitude, longitude } = event.coordinates;
+      // Use the location name for better context, fallback to coordinates
+      const query = encodeURIComponent(event.location);
+      return `https://www.google.com/maps/search/?api=1&query=${query}&center=${latitude},${longitude}`;
+    }
+    // Fallback: search by location name only
+    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.location)}`;
+  };
+
   // Filter events that have valid coordinates and match selected category
   const validEvents = events.filter(event => {
     // First check if coordinates are valid
@@ -334,14 +346,13 @@ const EventsMap = forwardRef<EventsMapRef, EventsMapProps>(({
                   </div>
                 )}
                 
-                {/* Bottom section with Categories and Event URL */}
+                {/* Bottom section with Categories and Links */}
                 <div className="pt-1 border-t border-gray-200">
-                  <div className="flex items-start justify-between gap-2">
-                    {/* Categories - Updated to handle multiple categories */}
-                    <div className="flex-1">
-                      {/* Multiple categories support (priority) */}
+                  <div className="flex items-center justify-between gap-2">
+                    {/* Categories */}
+                    <div className="flex-1 flex justify-left">
                       {event.category_ids && event.category_ids.length > 0 ? (
-                        <div className="flex flex-wrap gap-1">
+                        <div className="flex flex-wrap gap-1 justify-left">
                           {event.category_ids.slice(0, 3).map((categoryId: number, index: number) => {
                             const categoryName = categories[categoryId] || `Category ${categoryId}`;
                             
@@ -389,18 +400,41 @@ const EventsMap = forwardRef<EventsMapRef, EventsMapProps>(({
                       )}
                     </div>
                     
-                    {/* Event URL */}
-                    <a 
-                      href={event.url} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center text-blue-600 hover:text-blue-800 text-xs font-medium flex-shrink-0"
-                    >
-                      <span>View Details</span>
-                      <svg className="w-3 h-3 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                      </svg>
-                    </a>
+                    {/* Action Links */}
+                    <div className="flex gap-1 items-end min-w-fit">
+                      {/* View Details Link */}
+                      <a 
+                        href={event.url} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        title="View Details"
+                        className="group relative inline-flex items-center justify-center bg-blue-50 hover:bg-blue-100 text-blue-600 hover:text-blue-800 text-xs font-medium w-7 h-7 rounded transition-colors border border-blue-200"
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                        </svg>
+                        <span className="absolute right-full mr-2 px-2 py-1 bg-gray-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap pointer-events-none">
+                          View Details
+                        </span>
+                      </a>
+                      
+                      {/* Google Maps Link */}
+                      <a 
+                        href={getGoogleMapsUrl(event)} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        title="Open in Google Maps"
+                        className="group relative inline-flex items-center justify-center bg-green-50 hover:bg-green-100 text-green-600 hover:text-green-800 text-xs font-medium w-7 h-7 rounded transition-colors border border-green-200"
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                        <span className="absolute right-full mr-2 px-2 py-1 bg-gray-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap pointer-events-none">
+                          Google Maps
+                        </span>
+                      </a>
+                    </div>
                   </div>
                 </div>
               </div>

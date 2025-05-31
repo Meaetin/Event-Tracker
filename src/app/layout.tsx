@@ -4,6 +4,7 @@ import { Inter } from 'next/font/google';
 import Navigation from './components/Navigation';
 import { AuthProvider } from './context/AuthContext';
 import { Suspense } from 'react';
+import { StagewiseToolbar } from '@stagewise/toolbar-next';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -36,6 +37,9 @@ export default function RootLayout({
             </main>
           </Suspense>
         </AuthProvider>
+        {process.env.NODE_ENV === 'development' && (
+          <StagewiseToolbar config={{ plugins: [] }} />
+        )}
       </body>
     </html>
   );

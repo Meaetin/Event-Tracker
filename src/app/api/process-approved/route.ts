@@ -63,9 +63,21 @@ function formatDateString(dateStr: string): string | null {
     return now.toISOString().split('T')[0]; // Return YYYY-MM-DD format
   }
   
-  if (dateStr.toLowerCase().includes('every') || dateStr.toLowerCase().includes('ongoing')) {
+  if (dateStr.toLowerCase().includes('every')) {
     // For recurring events, return null since they don't have specific dates
     return null;
+  }
+  
+  if (dateStr.toLowerCase().includes('ongoing')) {
+    // For ongoing events (permanent stores), keep the original string
+    return dateStr;
+  }
+  
+  // Handle other special text dates that should be preserved
+  if (dateStr.toLowerCase().includes('now open') || 
+      dateStr.toLowerCase().includes('tba') ||
+      dateStr.toLowerCase().includes('check website')) {
+    return dateStr;
   }
 
   try {
