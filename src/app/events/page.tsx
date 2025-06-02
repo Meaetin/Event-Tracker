@@ -2,10 +2,10 @@
 
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { Suspense } from 'react';
-import { Metadata } from 'next';
 import dynamic from 'next/dynamic';
 import EventSidebar from '../components/common/EventSidebar';
 import { MapEvent } from '../types/database';
+import { EventsMapRef } from '../components/map/EventsMap';
 
 // Dynamically import the map to avoid SSR issues
 const EventsMap = dynamic(() => import('../components/map/EventsMap'), { 
@@ -26,7 +26,7 @@ export default function EventsPage() {
   const [showPermanentStores, setShowPermanentStores] = useState(true);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
-  const mapRef = useRef<any>(null);
+  const mapRef = useRef<EventsMapRef | null>(null);
 
   // Handle window resize and mobile detection
   useEffect(() => {
@@ -80,7 +80,7 @@ export default function EventsPage() {
     }
   }, [selectedEvent]);
 
-  const handleMapRef = useCallback((ref: any) => {
+  const handleMapRef = useCallback((ref: EventsMapRef) => {
     mapRef.current = ref;
   }, []);
 

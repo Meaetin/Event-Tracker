@@ -67,7 +67,7 @@ export default function HomePage() {
             </div>
             <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-2">Smart Filtering</h3>
             <p className="text-sm sm:text-base text-gray-600 leading-relaxed">
-              Filter events by category, date, location, and search terms to find exactly what you're looking for.
+              Filter events by category, date, location, and search terms to find exactly what you&apos;re looking for.
             </p>
           </div>
 
@@ -103,7 +103,7 @@ export default function HomePage() {
               <h4 className="text-base sm:text-lg font-semibold mb-3 md:mb-4">Connect with me</h4>
               <div className="space-y-3">
                 <p className="text-sm sm:text-base text-gray-400 leading-relaxed">
-                  Have questions or want to suggest an event? I'd love to hear from you!
+                  Have questions or want to suggest an event? I&apos;d love to hear from you!
                 </p>
                 <div className="flex space-x-4">
                   {/* GitHub */}

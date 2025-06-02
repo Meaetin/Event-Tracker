@@ -4,6 +4,7 @@ import { MapContainer, TileLayer, Marker, Popup, ZoomControl } from 'react-leafl
 import 'leaflet/dist/leaflet.css';
 import type { LatLngExpression } from 'leaflet';
 import { Icon } from 'leaflet';
+import * as L from 'leaflet';
 import { useEffect, useState, useRef, forwardRef, useImperativeHandle } from 'react';
 import { MapEvent, EventsApiResponse } from '../../types/database';
 
@@ -43,8 +44,8 @@ const EventsMap = forwardRef<EventsMapRef, EventsMapProps>(({
   const [loading, setLoading] = useState(!propEvents);
   const [error, setError] = useState<string | null>(null);
   const [categories, setCategories] = useState<{ [key: number]: string }>({});
-  const mapRef = useRef<any>(null);
-  const markersRef = useRef<{ [key: string]: any }>({});
+  const mapRef = useRef<L.Map | null>(null);
+  const markersRef = useRef<{ [key: string]: L.Marker }>({});
 
   // Expose methods to parent component
   useImperativeHandle(ref, () => ({
@@ -82,7 +83,7 @@ const EventsMap = forwardRef<EventsMapRef, EventsMapProps>(({
         const data = await response.json();
         if (data.success) {
           const categoryMap: { [key: number]: string } = {};
-          data.categories.forEach((cat: any) => {
+          data.categories.forEach((cat: { id: number; name: string }) => {
             categoryMap[cat.id] = cat.name;
           });
           setCategories(categoryMap);
@@ -200,11 +201,6 @@ const EventsMap = forwardRef<EventsMapRef, EventsMapProps>(({
   const formatTime = (timeString: string | null) => {
     if (!timeString) return null;
     return timeString; // Return the time string as-is since it's already formatted
-  };
-
-  const truncateText = (text: string, maxLength: number = 150) => {
-    if (text.length <= maxLength) return text;
-    return text.substring(0, maxLength) + '...';
   };
 
   // Function to generate Google Maps URL

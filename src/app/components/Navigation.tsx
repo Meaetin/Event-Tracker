@@ -9,7 +9,6 @@ import { supabase } from '../lib/supabase/supabaseClient';
 export default function Navigation() {
   const { user: authUser, isLoading: authLoading, signOut } = useAuth();
   const [role, setRole] = useState<string | null>('user'); // Default to user role
-  const [loading, setLoading] = useState(false); // Set to false to avoid loading state
   const [mounted, setMounted] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const pathname = usePathname();
@@ -21,7 +20,6 @@ export default function Navigation() {
   useEffect(() => {
     async function getUserRole() {
       if (!authUser) {
-        setLoading(false);
         return;
       }
       
@@ -42,8 +40,6 @@ export default function Navigation() {
       } catch (error) {
         console.error('Error in getUserRole:', error);
         setRole('user'); // Default to user role on error
-      } finally {
-        setLoading(false);
       }
     }
     
