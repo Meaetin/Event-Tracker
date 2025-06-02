@@ -11,6 +11,7 @@ export default function Navigation() {
   const [role, setRole] = useState<string | null>('user'); // Default to user role
   const [loading, setLoading] = useState(false); // Set to false to avoid loading state
   const [mounted, setMounted] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const pathname = usePathname();
 
   useEffect(() => {
@@ -58,21 +59,28 @@ export default function Navigation() {
 
   const isActive = (path: string) => pathname === path;
 
+  const toggleMobileMenu = () => {
+    setIsMobileMenuOpen(!isMobileMenuOpen);
+  };
+
   // Always render the nav structure to prevent hydration mismatch
   return (
     <nav className="bg-white shadow">
-      <div className="container mx-auto px-4">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
-          <div className="flex">
-            <div className="flex-shrink-0 flex items-center">
+          {/* Logo and hamburger button container */}
+          <div className="flex items-center">
+            <div className="flex-shrink-0">
               <Link href="/" className="text-xl font-bold text-blue-600">
                 EventScapeSG
               </Link>
             </div>
-            <div className="ml-6 flex items-center space-x-4">
+            
+            {/* Desktop navigation */}
+            <div className="hidden md:ml-6 md:flex md:items-center md:space-x-4">
               <Link 
                 href="/" 
-                className={`px-3 py-2 rounded-md text-sm font-medium ${
+                className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
                   isActive('/') ? 'text-blue-700 bg-blue-50' : 'text-gray-700 hover:text-blue-600'
                 }`}
               >
@@ -81,7 +89,7 @@ export default function Navigation() {
               
               <Link 
                 href="/events" 
-                className={`px-3 py-2 rounded-md text-sm font-medium ${
+                className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
                   isActive('/events') ? 'text-blue-700 bg-blue-50' : 'text-gray-700 hover:text-blue-600'
                 }`}
               >
@@ -94,7 +102,7 @@ export default function Navigation() {
                 <span className="ml-2 text-xs bg-gray-200 text-gray-600 px-2 py-1 rounded-full">
                   Coming Soon
                 </span>
-                <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 px-2 py-1 bg-gray-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 px-2 py-1 bg-gray-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
                   AI-powered itinerary planning
                 </div>
               </span>
@@ -104,7 +112,7 @@ export default function Navigation() {
                   {role === 'admin' ? (
                     <Link 
                       href="/dashboard/admin" 
-                      className={`px-3 py-2 rounded-md text-sm font-medium ${
+                      className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
                         isActive('/dashboard/admin') ? 'text-blue-700 bg-blue-50' : 'text-gray-700 hover:text-blue-600'
                       }`}
                     >
@@ -113,7 +121,7 @@ export default function Navigation() {
                   ) : (
                     <Link 
                       href="/dashboard/user" 
-                      className={`px-3 py-2 rounded-md text-sm font-medium ${
+                      className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
                         isActive('/dashboard/user') ? 'text-blue-700 bg-blue-50' : 'text-gray-700 hover:text-blue-600'
                       }`}
                     >
@@ -125,11 +133,12 @@ export default function Navigation() {
             </div>
           </div>
           
-          <div className="flex items-center">
+          {/* Desktop auth buttons */}
+          <div className="hidden md:flex md:items-center">
             {mounted && authUser ? (
               <button
                 onClick={handleSignOut}
-                className="ml-4 px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100"
+                className="ml-4 px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100 transition-colors"
               >
                 Sign Out
               </button>
@@ -137,7 +146,7 @@ export default function Navigation() {
               <div className="space-x-2">
                 <Link 
                   href="/auth/login" 
-                  className={`px-3 py-2 rounded-md text-sm font-medium ${
+                  className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
                     isActive('/auth/login') ? 'text-blue-700 bg-blue-50' : 'text-gray-700 hover:text-blue-600'
                   }`}
                 >
@@ -145,12 +154,136 @@ export default function Navigation() {
                 </Link>
                 <Link 
                   href="/auth/signup" 
-                  className="px-3 py-2 rounded-md text-sm font-medium bg-blue-600 text-white hover:bg-blue-700"
+                  className="px-3 py-2 rounded-md text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 transition-colors"
                 >
                   Sign Up
                 </Link>
               </div>
             )}
+          </div>
+
+          {/* Mobile menu button */}
+          <div className="md:hidden flex items-center">
+            <button
+              onClick={toggleMobileMenu}
+              className="inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500 transition-colors"
+              aria-expanded="false"
+            >
+              <span className="sr-only">Open main menu</span>
+              {/* Hamburger icon */}
+              <svg 
+                className={`${isMobileMenuOpen ? 'hidden' : 'block'} h-6 w-6`} 
+                xmlns="http://www.w3.org/2000/svg" 
+                fill="none" 
+                viewBox="0 0 24 24" 
+                stroke="currentColor"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+              {/* Close icon */}
+              <svg 
+                className={`${isMobileMenuOpen ? 'block' : 'hidden'} h-6 w-6`} 
+                xmlns="http://www.w3.org/2000/svg" 
+                fill="none" 
+                viewBox="0 0 24 24" 
+                stroke="currentColor"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        {/* Mobile menu */}
+        <div className={`${isMobileMenuOpen ? 'block' : 'hidden'} md:hidden`}>
+          <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3 border-t border-gray-200">
+            <Link 
+              href="/" 
+              className={`block px-3 py-2 rounded-md text-base font-medium transition-colors ${
+                isActive('/') ? 'text-blue-700 bg-blue-50' : 'text-gray-700 hover:text-blue-600 hover:bg-gray-50'
+              }`}
+              onClick={() => setIsMobileMenuOpen(false)}
+            >
+              Home
+            </Link>
+            
+            <Link 
+              href="/events" 
+              className={`block px-3 py-2 rounded-md text-base font-medium transition-colors ${
+                isActive('/events') ? 'text-blue-700 bg-blue-50' : 'text-gray-700 hover:text-blue-600 hover:bg-gray-50'
+              }`}
+              onClick={() => setIsMobileMenuOpen(false)}
+            >
+              Events Map
+            </Link>
+            
+            {/* AI Event Planning - Coming Soon (Mobile) */}
+            <div className="px-3 py-2 rounded-md text-base font-medium text-gray-400">
+              AI Event Planning
+              <span className="ml-2 text-xs bg-gray-200 text-gray-600 px-2 py-1 rounded-full">
+                Coming Soon
+              </span>
+            </div>
+            
+            {mounted && authUser && (
+              <>
+                {role === 'admin' ? (
+                  <Link 
+                    href="/dashboard/admin" 
+                    className={`block px-3 py-2 rounded-md text-base font-medium transition-colors ${
+                      isActive('/dashboard/admin') ? 'text-blue-700 bg-blue-50' : 'text-gray-700 hover:text-blue-600 hover:bg-gray-50'
+                    }`}
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    Admin Dashboard
+                  </Link>
+                ) : (
+                  <Link 
+                    href="/dashboard/user" 
+                    className={`block px-3 py-2 rounded-md text-base font-medium transition-colors ${
+                      isActive('/dashboard/user') ? 'text-blue-700 bg-blue-50' : 'text-gray-700 hover:text-blue-600 hover:bg-gray-50'
+                    }`}
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    Dashboard
+                  </Link>
+                )}
+              </>
+            )}
+
+            {/* Mobile auth section */}
+            <div className="border-t border-gray-200 pt-4">
+              {mounted && authUser ? (
+                <button
+                  onClick={() => {
+                    handleSignOut();
+                    setIsMobileMenuOpen(false);
+                  }}
+                  className="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:bg-gray-100 transition-colors"
+                >
+                  Sign Out
+                </button>
+              ) : mounted && (
+                <div className="space-y-1">
+                  <Link 
+                    href="/auth/login" 
+                    className={`block px-3 py-2 rounded-md text-base font-medium transition-colors ${
+                      isActive('/auth/login') ? 'text-blue-700 bg-blue-50' : 'text-gray-700 hover:text-blue-600 hover:bg-gray-50'
+                    }`}
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    Login
+                  </Link>
+                  <Link 
+                    href="/auth/signup" 
+                    className="block px-3 py-2 rounded-md text-base font-medium bg-blue-600 text-white hover:bg-blue-700 transition-colors mx-3"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    Sign Up
+                  </Link>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>

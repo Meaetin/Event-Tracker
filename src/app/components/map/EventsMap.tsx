@@ -1,6 +1,6 @@
 'use client';
 
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, ZoomControl } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import type { LatLngExpression } from 'leaflet';
 import { Icon } from 'leaflet';
@@ -269,11 +269,15 @@ const EventsMap = forwardRef<EventsMapRef, EventsMapProps>(({
         style={{ height: '100%', width: '100%' }}
         className="z-0"
         ref={mapRef}
+        zoomControl={false}
       >
         <TileLayer 
           attribution='&copy; <a href="https://carto.com/">CARTO</a>'
           url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
         />
+
+        {/* Zoom control positioned at bottom-right */}
+        <ZoomControl position="bottomright" />
 
         {validEvents.map((event) => (
           <Marker 

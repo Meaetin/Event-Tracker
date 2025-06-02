@@ -10,6 +10,8 @@ interface EventSidebarProps {
   selectedCategories?: string[];
   showPermanentStores?: boolean;
   onPermanentStoresChange?: (show: boolean) => void;
+  isMobile?: boolean;
+  onClose?: () => void;
 }
 
 export default function EventSidebar({ 
@@ -18,7 +20,9 @@ export default function EventSidebar({
   onCategoryChange, 
   selectedCategories: propSelectedCategories,
   showPermanentStores: propShowPermanentStores = true,
-  onPermanentStoresChange
+  onPermanentStoresChange,
+  isMobile = false,
+  onClose
 }: EventSidebarProps) {
   const [events, setEvents] = useState<MapEvent[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -225,7 +229,7 @@ export default function EventSidebar({
 
   if (loading) {
     return (
-      <div className="w-80 bg-white shadow-lg border-r border-gray-200 p-4">
+      <div className="w-full h-full bg-white shadow-lg border-r border-gray-200 p-4">
         <div className="animate-pulse space-y-4">
           <div className="h-4 bg-gray-200 rounded w-3/4"></div>
           <div className="h-4 bg-gray-200 rounded w-1/2"></div>
@@ -241,7 +245,7 @@ export default function EventSidebar({
 
   if (error) {
     return (
-      <div className="w-80 bg-white shadow-lg border-r border-gray-200 p-4">
+      <div className="w-full h-full bg-white shadow-lg border-r border-gray-200 p-4">
         <div className="text-red-600 text-sm">
           <p className="font-medium">Error loading events</p>
           <p>{error}</p>
@@ -257,9 +261,24 @@ export default function EventSidebar({
   }
 
   return (
-    <div className="w-80 bg-white shadow-lg border-r border-gray-200 h-full overflow-y-auto">
+    <div className="w-full h-full bg-white shadow-lg border-r border-gray-200 overflow-y-auto">
       {/* Header */}
-      <div className="p-4 border-b border-gray-200">
+      <div className="p-3 sm:p-4 border-b border-gray-200">
+        {/* Mobile Header with Close Button */}
+        {isMobile && onClose && (
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-lg font-semibold text-gray-900">Events</h2>
+            <button
+              onClick={onClose}
+              className="p-1 rounded-md text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-colors"
+              aria-label="Close sidebar"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        )}
         
         {/* Search */}
         <div className="mb-3">
@@ -313,7 +332,7 @@ export default function EventSidebar({
                 Reset
               </button>
             </div>
-            <div className="max-h-40 overflow-y-auto border border-gray-200 rounded-md p-2 space-y-1">
+            <div className="max-h-32 sm:max-h-40 overflow-y-auto border border-gray-200 rounded-md p-2 space-y-1">
               {categories.map(category => (
                 <label key={category.id} className="flex items-center cursor-pointer hover:bg-gray-50 p-1 rounded">
                   <input
@@ -353,7 +372,7 @@ export default function EventSidebar({
               <div
                 key={event.id}
                 onClick={() => handleEventClick(event)}
-                className={`p-4 rounded-lg border cursor-pointer transition-all duration-200 hover:shadow-md hover:scale-[1.02] ${
+                className={`p-3 sm:p-4 rounded-lg border cursor-pointer transition-all duration-200 hover:shadow-md hover:scale-[1.02] ${
                   selectedEventId === event.id
                     ? 'border-blue-500 bg-blue-50 shadow-md'
                     : 'border-gray-200 hover:border-gray-300'
@@ -361,11 +380,11 @@ export default function EventSidebar({
               >
                 {/* Event Image */}
                 {event.images && event.images.length > 0 && (
-                  <div className="mb-4 overflow-hidden rounded-lg">
+                  <div className="mb-3 sm:mb-4 overflow-hidden rounded-lg">
                     <img 
                       src={event.images[0]} 
                       alt={event.name}
-                      className="w-full h-40 object-cover hover:scale-105 transition-transform duration-200"
+                      className="w-full h-32 sm:h-40 object-cover hover:scale-105 transition-transform duration-200"
                       onError={(e) => {
                         (e.target as HTMLImageElement).style.display = 'none';
                       }}
@@ -374,41 +393,41 @@ export default function EventSidebar({
                 )}
 
                 {/* Event Name */}
-                <h3 className="font-semibold text-gray-900 mb-2 leading-tight text-base">
+                <h3 className="font-semibold text-gray-900 mb-2 leading-tight text-sm sm:text-base">
                   {event.name}
                 </h3>
 
                 {/* Date */}
-                <div className="flex items-center mb-2 text-sm text-gray-600">
-                  <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div className="flex items-center mb-2 text-xs sm:text-sm text-gray-600">
+                  <svg className="w-4 h-4 sm:w-5 sm:h-5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                   </svg>
-                  <span>{formatDate(event.start_date, event.end_date)}</span>
+                  <span className="leading-tight">{formatDate(event.start_date, event.end_date)}</span>
                 </div>
 
                 {/* Time */}
                 {formatTime(event.time) && (
-                  <div className="flex items-center mb-2 text-sm text-gray-600">
-                    <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <div className="flex items-center mb-2 text-xs sm:text-sm text-gray-600">
+                    <svg className="w-4 h-4 sm:w-5 sm:h-5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
-                    <span>{formatTime(event.time)}</span>
+                    <span className="leading-tight">{formatTime(event.time)}</span>
                   </div>
                 )}
 
                 {/* Location */}
-                <div className="flex items-start mb-3 text-sm text-gray-600">
-                  <svg className="w-5 h-5 mr-2 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div className="flex items-start mb-3 text-xs sm:text-sm text-gray-600">
+                  <svg className="w-4 h-4 sm:w-5 sm:h-5 mr-2 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                   </svg>
-                  <span className="leading-tight">{truncateText(event.location, 60)}</span>
+                  <span className="leading-tight">{truncateText(event.location, isMobile ? 40 : 60)}</span>
                 </div>
 
                 {/* Description */}
                 {event.description && (
-                  <p className="text-sm text-gray-700 mb-3 leading-relaxed">
-                    {truncateText(event.description, 120)}
+                  <p className="text-xs sm:text-sm text-gray-700 mb-3 leading-relaxed">
+                    {truncateText(event.description, isMobile ? 80 : 120)}
                   </p>
                 )}
 
@@ -416,7 +435,7 @@ export default function EventSidebar({
                 <div className="flex justify-between items-center">
                   {/* Category */}
                   {event.categories && (
-                    <span className="inline-block bg-blue-100 text-blue-800 text-sm px-3 py-1 rounded-full font-medium">
+                    <span className="inline-block bg-blue-100 text-blue-800 text-xs sm:text-sm px-2 sm:px-3 py-1 rounded-full font-medium">
                       {Array.isArray(event.categories) ? event.categories[0]?.name : event.categories.name}
                     </span>
                   )}
@@ -424,10 +443,10 @@ export default function EventSidebar({
                   {/* Coordinates indicator */}
                   {event.coordinates && (
                     <div className="flex items-center text-green-600" title="Click to view on map">
-                      <svg className="w-5 h-5 mr-1" fill="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-4 h-4 sm:w-5 sm:h-5 mr-1" fill="currentColor" viewBox="0 0 24 24">
                         <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
                       </svg>
-                      <span className="text-sm font-medium">View on map</span>
+                      <span className="text-xs sm:text-sm font-medium">View on map</span>
                     </div>
                   )}
                 </div>
