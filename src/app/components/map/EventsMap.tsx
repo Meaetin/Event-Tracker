@@ -2,6 +2,8 @@
 
 import { MapContainer, TileLayer, Marker, Popup, ZoomControl } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
+import 'react-leaflet-markercluster/styles';
+import MarkerClusterGroup from 'react-leaflet-markercluster';
 import type { LatLngExpression } from 'leaflet';
 import { Icon } from 'leaflet';
 import * as L from 'leaflet';
@@ -215,6 +217,26 @@ const EventsMap = forwardRef<EventsMapRef, EventsMapProps>(({
     return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.location)}`;
   };
 
+  // Custom cluster icon creation function
+  const createClusterCustomIcon = (cluster: any) => {
+    const count = cluster.getChildCount();
+    let className = 'marker-cluster-small';
+    
+    if (count < 10) {
+      className = 'marker-cluster-small';
+    } else if (count < 100) {
+      className = 'marker-cluster-medium';
+    } else {
+      className = 'marker-cluster-large';
+    }
+
+    return L.divIcon({
+      html: `<div><span>${count}</span></div>`,
+      className: `marker-cluster ${className}`,
+      iconSize: L.point(40, 40, true),
+    });
+  };
+
   // Filter events that have valid coordinates and match selected category
   const validEvents = events.filter(event => {
     // First check if coordinates are valid
@@ -275,172 +297,184 @@ const EventsMap = forwardRef<EventsMapRef, EventsMapProps>(({
         {/* Zoom control positioned at bottom-right */}
         <ZoomControl position="bottomright" />
 
-        {validEvents.map((event) => (
-          <Marker 
-            key={event.id}
-            position={[event.coordinates!.latitude, event.coordinates!.longitude]} 
-            icon={eventIcon}
-            ref={(markerRef) => {
-              if (markerRef) {
-                markersRef.current[event.id] = markerRef;
-              }
-            }}
-          >
-            <Popup maxWidth={450} className="event-popup">
-              <div className="p-1 max-w-lg">
-                <div className="flex gap-2">
-                  {/* Left: Event Image */}
-                  {event.images && event.images.length > 0 && (
-                    <div className="w-32 h-24 flex-shrink-0 overflow-hidden rounded">
-                      <img 
-                        src={event.images[0]} 
-                        alt={event.name}
-                        className="w-full h-full object-cover hover:scale-105 transition-transform duration-200"
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).style.display = 'none';
-                        }}
-                      />
-                    </div>
-                  )}
-                  
-                  {/* Right: Text content */}
-                  <div className="flex-1 min-w-0">
-                    {/* Event Name */}
-                    <h3 className="font-bold text-base text-gray-900 mb-1 leading-tight">
-                      {event.name}
-                    </h3>
+        {/* Marker Cluster Group */}
+        <MarkerClusterGroup
+          iconCreateFunction={createClusterCustomIcon}
+          maxClusterRadius={40}
+          disableClusteringAtZoom={15}
+          spiderfyOnMaxZoom={true}
+          showCoverageOnHover={true}
+          zoomToBoundsOnClick={true}
+          removeOutsideVisibleBounds={true}
+          animate={true}
+        >
+          {validEvents.map((event) => (
+            <Marker 
+              key={event.id}
+              position={[event.coordinates!.latitude, event.coordinates!.longitude]} 
+              icon={eventIcon}
+              ref={(markerRef) => {
+                if (markerRef) {
+                  markersRef.current[event.id] = markerRef;
+                }
+              }}
+            >
+              <Popup maxWidth={450} className="event-popup">
+                <div className="p-1 max-w-lg">
+                  <div className="flex gap-2">
+                    {/* Left: Event Image */}
+                    {event.images && event.images.length > 0 && (
+                      <div className="w-32 h-24 flex-shrink-0 overflow-hidden rounded">
+                        <img 
+                          src={event.images[0]} 
+                          alt={event.name}
+                          className="w-full h-full object-cover hover:scale-105 transition-transform duration-200"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).style.display = 'none';
+                          }}
+                        />
+                      </div>
+                    )}
                     
-                    {/* Date */}
-                    <div className="flex items-center mb-0.5 text-xs text-gray-600">
-                      <svg className="w-3 h-3 mr-1 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                      </svg>
-                      <span>{formatDate(event.start_date, event.end_date)}</span>
-                    </div>
-                    
-                    {/* Time - Show even if no time available */}
-                    <div className="flex items-center mb-0.5 text-xs text-gray-600">
-                      <svg className="w-3 h-3 mr-1 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                      <span>{formatTime(event.time) || 'Time TBA'}</span>
-                    </div>
-                    
-                    {/* Location */}
-                    <div className="flex items-start text-xs text-gray-600">
-                      <svg className="w-3 h-3 mr-1 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                      </svg>
-                      <span className="leading-tight">{event.location}</span>
-                    </div>
-                  </div>
-                </div>
-                
-                {/* Description */}
-                {event.description && (
-                  <div className="mb-2">
-                    <p className="text-xs text-gray-700 leading-relaxed">
-                      {event.description}
-                    </p>
-                  </div>
-                )}
-                
-                {/* Bottom section with Categories and Links */}
-                <div className="pt-1 border-t border-gray-200">
-                  <div className="flex items-center justify-between gap-2">
-                    {/* Categories */}
-                    <div className="flex-1 flex justify-left">
-                      {event.category_ids && event.category_ids.length > 0 ? (
-                        <div className="flex flex-wrap gap-1 justify-left">
-                          {event.category_ids.slice(0, 3).map((categoryId: number, index: number) => {
-                            const categoryName = categories[categoryId] || `Category ${categoryId}`;
-                            
-                            // Debug logging for development
-                            if (process.env.NODE_ENV === 'development' && index === 0) {
-                              console.log('Event categories debug:', {
-                                eventName: event.name,
-                                category_ids: event.category_ids,
-                                categories: event.categories,
-                                category_id: event.category_id,
-                                categoriesLookup: categories
-                              });
-                            }
-                            
-                            return (
-                              <span 
-                                key={`category-${categoryId}-${index}`}
-                                className="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-0.5 rounded-full"
-                              >
-                                {categoryName}
-                              </span>
-                            );
-                          })}
-                          {event.category_ids.length > 3 && (
-                            <span className="inline-block bg-gray-100 text-gray-600 text-xs px-2 py-0.5 rounded-full">
-                              +{event.category_ids.length - 3} more
-                            </span>
-                          )}
-                        </div>
-                      ) : event.categories ? (
-                        /* Single category fallback */
-                        <span className="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-0.5 rounded-full">
-                          {Array.isArray(event.categories) ? event.categories[0]?.name : event.categories.name}
-                        </span>
-                      ) : event.category_id && categories[event.category_id] ? (
-                        /* Legacy category_id support */
-                        <span className="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-0.5 rounded-full">
-                          {categories[event.category_id]}
-                        </span>
-                      ) : (
-                        /* No categories available */
-                        <span className="inline-block bg-gray-100 text-gray-600 text-xs px-2 py-0.5 rounded-full">
-                          Uncategorized
-                        </span>
-                      )}
-                    </div>
-                    
-                    {/* Action Links */}
-                    <div className="flex gap-1 items-end min-w-fit">
-                      {/* View Details Link */}
-                      <a 
-                        href={event.url} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        title="View Details"
-                        className="group relative inline-flex items-center justify-center bg-blue-50 hover:bg-blue-100 text-blue-600 hover:text-blue-800 text-xs font-medium w-7 h-7 rounded transition-colors border border-blue-200"
-                      >
-                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                        </svg>
-                        <span className="absolute right-full mr-2 px-2 py-1 bg-gray-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap pointer-events-none">
-                          View Details
-                        </span>
-                      </a>
+                    {/* Right: Text content */}
+                    <div className="flex-1 min-w-0">
+                      {/* Event Name */}
+                      <h3 className="font-bold text-base text-gray-900 mb-1 leading-tight">
+                        {event.name}
+                      </h3>
                       
-                      {/* Google Maps Link */}
-                      <a 
-                        href={getGoogleMapsUrl(event)} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        title="Open in Google Maps"
-                        className="group relative inline-flex items-center justify-center bg-green-50 hover:bg-green-100 text-green-600 hover:text-green-800 text-xs font-medium w-7 h-7 rounded transition-colors border border-green-200"
-                      >
-                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      {/* Date */}
+                      <div className="flex items-center mb-0.5 text-xs text-gray-600">
+                        <svg className="w-3 h-3 mr-1 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                        <span>{formatDate(event.start_date, event.end_date)}</span>
+                      </div>
+                      
+                      {/* Time - Show even if no time available */}
+                      <div className="flex items-center mb-0.5 text-xs text-gray-600">
+                        <svg className="w-3 h-3 mr-1 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <span>{formatTime(event.time) || 'Time TBA'}</span>
+                      </div>
+                      
+                      {/* Location */}
+                      <div className="flex items-start text-xs text-gray-600">
+                        <svg className="w-3 h-3 mr-1 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                         </svg>
-                        <span className="absolute right-full mr-2 px-2 py-1 bg-gray-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap pointer-events-none">
-                          Google Maps
-                        </span>
-                      </a>
+                        <span className="leading-tight">{event.location}</span>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Description */}
+                  {event.description && (
+                    <div className="mb-2">
+                      <p className="text-xs text-gray-700 leading-relaxed">
+                        {event.description}
+                      </p>
+                    </div>
+                  )}
+                  
+                  {/* Bottom section with Categories and Links */}
+                  <div className="pt-1 border-t border-gray-200">
+                    <div className="flex items-center justify-between gap-2">
+                      {/* Categories */}
+                      <div className="flex-1 flex justify-left">
+                        {event.category_ids && event.category_ids.length > 0 ? (
+                          <div className="flex flex-wrap gap-1 justify-left">
+                            {event.category_ids.slice(0, 3).map((categoryId: number, index: number) => {
+                              const categoryName = categories[categoryId] || `Category ${categoryId}`;
+                              
+                              // Debug logging for development
+                              if (process.env.NODE_ENV === 'development' && index === 0) {
+                                console.log('Event categories debug:', {
+                                  eventName: event.name,
+                                  category_ids: event.category_ids,
+                                  categories: event.categories,
+                                  category_id: event.category_id,
+                                  categoriesLookup: categories
+                                });
+                              }
+                              
+                              return (
+                                <span 
+                                  key={`category-${categoryId}-${index}`}
+                                  className="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-0.5 rounded-full"
+                                >
+                                  {categoryName}
+                                </span>
+                              );
+                            })}
+                            {event.category_ids.length > 3 && (
+                              <span className="inline-block bg-gray-100 text-gray-600 text-xs px-2 py-0.5 rounded-full">
+                                +{event.category_ids.length - 3} more
+                              </span>
+                            )}
+                          </div>
+                        ) : event.categories ? (
+                          /* Single category fallback */
+                          <span className="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-0.5 rounded-full">
+                            {Array.isArray(event.categories) ? event.categories[0]?.name : event.categories.name}
+                          </span>
+                        ) : event.category_id && categories[event.category_id] ? (
+                          /* Legacy category_id support */
+                          <span className="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-0.5 rounded-full">
+                            {categories[event.category_id]}
+                          </span>
+                        ) : (
+                          /* No categories available */
+                          <span className="inline-block bg-gray-100 text-gray-600 text-xs px-2 py-0.5 rounded-full">
+                            Uncategorized
+                          </span>
+                        )}
+                      </div>
+                      
+                      {/* Action Links */}
+                      <div className="flex gap-1 items-end min-w-fit">
+                        {/* View Details Link */}
+                        <a 
+                          href={event.url} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          title="View Details"
+                          className="group relative inline-flex items-center justify-center bg-blue-50 hover:bg-blue-100 text-blue-600 hover:text-blue-800 text-xs font-medium w-7 h-7 rounded transition-colors border border-blue-200"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                          </svg>
+                          <span className="absolute right-full mr-2 px-2 py-1 bg-gray-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap pointer-events-none">
+                            View Details
+                          </span>
+                        </a>
+                        
+                        {/* Google Maps Link */}
+                        <a 
+                          href={getGoogleMapsUrl(event)} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          title="Open in Google Maps"
+                          className="group relative inline-flex items-center justify-center bg-green-50 hover:bg-green-100 text-green-600 hover:text-green-800 text-xs font-medium w-7 h-7 rounded transition-colors border border-green-200"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                          </svg>
+                          <span className="absolute right-full mr-2 px-2 py-1 bg-gray-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap pointer-events-none">
+                            Google Maps
+                          </span>
+                        </a>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            </Popup>
-          </Marker>
-        ))}
+              </Popup>
+            </Marker>
+          ))}
+        </MarkerClusterGroup>
       </MapContainer>
       
       {/* Events counter */}

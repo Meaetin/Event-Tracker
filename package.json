@@ -11,12 +11,14 @@
   "dependencies": {
     "@supabase/ssr": "^0.6.1",
     "@supabase/supabase-js": "^2.49.4",
+    "leaflet.markercluster": "^1.5.3",
     "next": "15.3.2",
     "openai": "^4.103.0",
     "puppeteer": "^24.8.2",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-leaflet": "^5.0.0",
+    "react-leaflet-markercluster": "^5.0.0-rc.0",
     "ts-node": "^10.9.2"
   },
   "devDependencies": {

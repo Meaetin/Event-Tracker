@@ -17,7 +17,7 @@ export default function SignUp() {
     e.preventDefault();
     setLoading(true);
     setError(null);
-
+    
     try {
       // Create the user in Supabase Auth
       const { data: authData, error: authError } = await supabase.auth.signUp({
