@@ -46,6 +46,7 @@ const EventsMap = forwardRef<EventsMapRef, EventsMapProps>(({
   const [loading, setLoading] = useState(!propEvents);
   const [error, setError] = useState<string | null>(null);
   const [categories, setCategories] = useState<{ [key: number]: string }>({});
+  const [currentZoom, setCurrentZoom] = useState<number>(zoom);
   const mapRef = useRef<L.Map | null>(null);
   const markersRef = useRef<{ [key: string]: L.Marker }>({});
 
@@ -77,6 +78,41 @@ const EventsMap = forwardRef<EventsMapRef, EventsMapProps>(({
   useEffect(() => {
     fetchCategories();
   }, []);
+
+  // Track zoom level changes and handle map invalidation
+  useEffect(() => {
+    if (mapRef.current) {
+      const map = mapRef.current;
+      
+      const handleZoomEnd = () => {
+        setCurrentZoom(map.getZoom());
+        // Force map to refresh tiles after zoom
+        setTimeout(() => {
+          map.invalidateSize();
+        }, 100);
+      };
+
+      const handleMoveEnd = () => {
+        // Force map to refresh tiles after move
+        setTimeout(() => {
+          map.invalidateSize();
+        }, 100);
+      };
+      
+      map.on('zoomend', handleZoomEnd);
+      map.on('moveend', handleMoveEnd);
+      
+      // Initial invalidation to ensure proper rendering
+      setTimeout(() => {
+        map.invalidateSize();
+      }, 300);
+      
+      return () => {
+        map.off('zoomend', handleZoomEnd);
+        map.off('moveend', handleMoveEnd);
+      };
+    }
+  }, [mapRef.current]);
 
   const fetchCategories = async () => {
     try {
@@ -115,6 +151,29 @@ const EventsMap = forwardRef<EventsMapRef, EventsMapProps>(({
       }
     }
   }, [selectedEventId, events]);
+
+  // Handle container resize to fix tile loading issues
+  useEffect(() => {
+    if (mapRef.current) {
+      const map = mapRef.current;
+      const container = map.getContainer();
+      
+      const resizeObserver = new ResizeObserver(() => {
+        // Invalidate map size when container changes
+        setTimeout(() => {
+          map.invalidateSize();
+        }, 100);
+      });
+      
+      if (container) {
+        resizeObserver.observe(container);
+      }
+      
+      return () => {
+        resizeObserver.disconnect();
+      };
+    }
+  }, [mapRef.current]);
 
   const fetchEvents = async () => {
     try {
@@ -237,6 +296,32 @@ const EventsMap = forwardRef<EventsMapRef, EventsMapProps>(({
     });
   };
 
+  // Create marker with optional label for high zoom levels
+  const createMarkerWithLabel = (event: MapEvent) => {
+    if (currentZoom >= 15) {
+      // Create marker with label at zoom 15+ - show full name
+      const eventName = event.name;
+      
+      return L.divIcon({
+        html: `
+          <div class="marker-with-label">
+            <div class="marker-icon">
+              <img src="https://cdn-icons-png.flaticon.com/128/684/684908.png" alt="Event" />
+            </div>
+            <div class="marker-label">${eventName}</div>
+          </div>
+        `,
+        className: 'custom-marker-with-label',
+        iconSize: [30, 60],
+        iconAnchor: [15, 60],
+        popupAnchor: [0, -60],
+      });
+    } else {
+      // Use regular icon for lower zoom levels
+      return eventIcon;
+    }
+  };
+
   // Filter events that have valid coordinates and match selected category
   const validEvents = events.filter(event => {
     // First check if coordinates are valid
@@ -284,14 +369,27 @@ const EventsMap = forwardRef<EventsMapRef, EventsMapProps>(({
         center={center}
         zoom={zoom}
         scrollWheelZoom={true}
-        style={{ height: '100%', width: '100%' }}
+        style={{ height: '100%', width: '100%', minHeight: '400px' }}
         className="z-0"
         ref={mapRef}
         zoomControl={false}
+        whenReady={() => {
+          // Ensure map renders properly when ready
+          if (mapRef.current) {
+            setTimeout(() => {
+              mapRef.current?.invalidateSize();
+            }, 100);
+          }
+        }}
       >
         <TileLayer 
           attribution='&copy; <a href="https://carto.com/">CARTO</a>'
           url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+          errorTileUrl="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="
+          maxZoom={19}
+          keepBuffer={2}
+          updateWhenIdle={false}
+          updateWhenZooming={true}
         />
 
         {/* Zoom control positioned at bottom-right */}
@@ -310,9 +408,9 @@ const EventsMap = forwardRef<EventsMapRef, EventsMapProps>(({
         >
           {validEvents.map((event) => (
             <Marker 
-              key={event.id}
+              key={`${event.id}-${currentZoom}`}
               position={[event.coordinates!.latitude, event.coordinates!.longitude]} 
-              icon={eventIcon}
+              icon={createMarkerWithLabel(event)}
               ref={(markerRef) => {
                 if (markerRef) {
                   markersRef.current[event.id] = markerRef;

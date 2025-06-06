@@ -11,7 +11,11 @@ const inter = Inter({ subsets: ['latin'] });
 export const metadata: Metadata = {
   title: 'EventScapeSG',
   description: 'Discover events happening around Singapore with EventScapeSG',
-  viewport: 'width=device-width, initial-scale=1',
+};
+
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
 };
 
 function LoadingSpinner() {
