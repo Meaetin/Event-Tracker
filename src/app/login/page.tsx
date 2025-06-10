@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from 'react';
-import { supabase } from '../../lib/supabase/supabaseClient';
+import { supabase } from '../../lib/supabaseClient';
 import Link from 'next/link';
 
 export default function Login() {
@@ -16,16 +16,14 @@ export default function Login() {
     setError(null);
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { error } = await supabase.auth.signInWithPassword({ // Sign in with password
         email,
         password,
       });
 
-      if (error) throw error;
+      if (error) throw error; // If there is an error, throw it
 
-      // Login successful - use window.location directly
-      // This is more reliable and prevents loops
-      window.location.href = '/';
+      window.location.href = '/dashboard'; // Redirect to the dashboard
       
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'An error occurred during login';
@@ -85,7 +83,7 @@ export default function Login() {
         
         <p className="mt-4 text-center text-sm">
           Don&apos;t have an account?{' '}
-          <Link href="/auth/signup" className="text-blue-600 hover:underline">
+          <Link href="/signup" className="text-blue-600 hover:underline">
             Sign up
           </Link>
         </p>

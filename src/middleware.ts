@@ -1,10 +1,9 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
+import { getCurrentSession } from './lib/auth';
 
-export async function middleware(req: NextRequest) {
-  console.log('Middleware running for path:', req.nextUrl.pathname);
-  
+export async function middleware(req: NextRequest) {  
   // Create a response object that we'll modify
   const res = NextResponse.next();
   
@@ -21,7 +20,7 @@ export async function middleware(req: NextRequest) {
   // If there are no cookies at all, redirect to login
   if (supabaseCookies.length === 0) {
     console.log('No cookies found, redirecting to login');
-    return NextResponse.redirect(new URL('/auth/login', req.url));
+    return NextResponse.redirect(new URL('/login', req.url));
   }
   
   // Create a supabase client with updated API
@@ -30,15 +29,11 @@ export async function middleware(req: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        getAll: () => {
-          return req.cookies.getAll().map((cookie) => ({
-            name: cookie.name,
-            value: cookie.value,
-          }));
-        },
+        getAll: () =>
+          req.cookies.getAll().map(({ name, value }) => ({ name, value })),
         setAll: (cookies) => {
-          cookies.forEach((cookie) => {
-            res.cookies.set(cookie.name, cookie.value, cookie.options);
+          cookies.forEach(({ name, value, options }) => {
+            res.cookies.set(name, value, options);
           });
         },
       },
@@ -47,45 +42,24 @@ export async function middleware(req: NextRequest) {
   
   try {
     // Check the session
-    const { data } = await supabase.auth.getSession();
+    const { data: { session }, error } = await supabase.auth.getSession(); // Get the session
     
-    if (!data.session) {
-      console.log('No valid session found, redirecting to login');
-      return NextResponse.redirect(new URL('/auth/login', req.url));
-    }
-    
-    console.log('Session found for user:', data.session.user.id);
-    
-    // Admin route check
-    const isAdminRoute = req.nextUrl.pathname.startsWith('/dashboard/admin');
-    
-    // Check admin access if needed
-    if (isAdminRoute) {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', data.session.user.id)
-        .single();
-      
-      if (!profile || profile.role !== 'admin') {
-        console.log('User is not an admin, redirecting');
-        return NextResponse.redirect(new URL('/dashboard/user', req.url));
+    if (session) { // If the session is valid
+      const {data: {user}} = await supabase.auth.getUser(); // Get the user
+      if (user) { // If the user is valid
+        // Add user info to headers for server components
+        res.headers.set('x-user-id', session.user.id);
+        res.headers.set('x-auth-state', 'authenticated');
+
+        return res;
       }
+    } else {
+      console.log('No valid session found, redirecting to login');
+      return NextResponse.redirect(new URL('/login', req.url));
     }
-    
-    // Add user info to headers for server components
-    res.headers.set('x-user-id', data.session.user.id);
-    res.headers.set('x-auth-state', 'authenticated');
-    
-    return res;
-    
   } catch (err) {
     console.error('Error in auth middleware:', err);
     // On error, continue but don't set auth headers
     return res;
   }
 }
-
-export const config = {
-  matcher: ['/dashboard/:path*'],
-}; 

@@ -1,8 +1,8 @@
 import './globals.css';
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
-import Navigation from './components/Navigation';
-import { AuthProvider } from './context/AuthContext';
+import Navbar from '../components/Navbar';
+import { AuthProvider } from '../context/AuthProvider';
 import { Suspense } from 'react';
 import { StagewiseToolbar } from '@stagewise/toolbar-next';
 
@@ -36,7 +36,7 @@ export default function RootLayout({
       <body className={inter.className}>
         <AuthProvider>
           <Suspense fallback={<LoadingSpinner />}>
-            <Navigation />
+            <Navbar />
             <main>
               {children}
             </main>

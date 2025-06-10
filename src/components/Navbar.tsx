@@ -3,58 +3,37 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useAuth } from '../context/AuthContext';
-import { supabase } from '../lib/supabase/supabaseClient';
+import { useAuth } from '../context/AuthProvider';
+import { getUserRole } from '../lib/auth';
 
-export default function Navigation() {
+export default function Navbar() {
   const { user: authUser, isLoading: authLoading, signOut } = useAuth();
-  const [role, setRole] = useState<string | null>('user'); // Default to user role
+  const [role, setRole] = useState<string | null>('user');
   const [mounted, setMounted] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const pathname = usePathname();
 
+  // Set the mounted flag to true when the component mounts
   useEffect(() => {
-    setMounted(true);
+    setMounted(true); 
   }, []);
 
+  // Get the user role from the profiles table
   useEffect(() => {
-    async function getUserRole() {
-      if (!authUser) {
-        return;
-      }
-      
-      try {
-        // Get user role from profiles
-        const { data: profile, error } = await supabase
-          .from('profiles')
-          .select('*')  // Select all fields to ensure we get the profile
-          .eq('id', authUser.id)
-          .single();
-
-        if (error) {
-          console.error('Error fetching profile:', error);
-          setRole('user'); // Default to user role on error
-        } else if (profile) {
-          setRole(profile.role || 'user'); // Default to user if role is null
-        }
-      } catch (error) {
-        console.error('Error in getUserRole:', error);
-        setRole('user'); // Default to user role on error
-      }
-    }
-    
-    if (!authLoading && mounted) {
-      getUserRole();
+    if (!authLoading && mounted && authUser) {
+      getUserRole(authUser, setRole);
     }
   }, [authUser, authLoading, mounted]);
 
   const handleSignOut = async () => {
     await signOut();
-    window.location.href = '/auth/login';
+    window.location.href = '/login';
   };
 
+  // Check which page is user on
   const isActive = (path: string) => pathname === path;
 
+  // Set mobile menu open to true or false
   const toggleMobileMenu = () => {
     setIsMobileMenuOpen(!isMobileMenuOpen);
   };
@@ -105,25 +84,14 @@ export default function Navigation() {
               
               {mounted && authUser && (
                 <>
-                  {role === 'admin' ? (
-                    <Link 
-                      href="/dashboard/admin" 
-                      className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                        isActive('/dashboard/admin') ? 'text-blue-700 bg-blue-50' : 'text-gray-700 hover:text-blue-600'
-                      }`}
-                    >
-                      Admin Dashboard
-                    </Link>
-                  ) : (
-                    <Link 
-                      href="/dashboard/user" 
-                      className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                        isActive('/dashboard/user') ? 'text-blue-700 bg-blue-50' : 'text-gray-700 hover:text-blue-600'
-                      }`}
-                    >
-                      Dashboard
-                    </Link>
-                  )}
+                  <Link 
+                    href="/dashboard" 
+                    className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                      isActive('/dashboard') ? 'text-blue-700 bg-blue-50' : 'text-gray-700 hover:text-blue-600'
+                    }`}
+                  >
+                    Dashboard
+                  </Link> 
                 </>
               )}
             </div>
@@ -141,15 +109,15 @@ export default function Navigation() {
             ) : mounted && (
               <div className="space-x-2">
                 <Link 
-                  href="/auth/login" 
+                  href="/login" 
                   className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                    isActive('/auth/login') ? 'text-blue-700 bg-blue-50' : 'text-gray-700 hover:text-blue-600'
+                    isActive('/login') ? 'text-blue-700 bg-blue-50' : 'text-gray-700 hover:text-blue-600'
                   }`}
                 >
                   Login
                 </Link>
                 <Link 
-                  href="/auth/signup" 
+                  href="/signup" 
                   className="px-3 py-2 rounded-md text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 transition-colors"
                 >
                   Sign Up
@@ -225,9 +193,9 @@ export default function Navigation() {
               <>
                 {role === 'admin' ? (
                   <Link 
-                    href="/dashboard/admin" 
+                    href="/dashboard" 
                     className={`block px-3 py-2 rounded-md text-base font-medium transition-colors ${
-                      isActive('/dashboard/admin') ? 'text-blue-700 bg-blue-50' : 'text-gray-700 hover:text-blue-600 hover:bg-gray-50'
+                      isActive('/dashboard') ? 'text-blue-700 bg-blue-50' : 'text-gray-700 hover:text-blue-600 hover:bg-gray-50'
                     }`}
                     onClick={() => setIsMobileMenuOpen(false)}
                   >
@@ -235,9 +203,9 @@ export default function Navigation() {
                   </Link>
                 ) : (
                   <Link 
-                    href="/dashboard/user" 
+                    href="/dashboard" 
                     className={`block px-3 py-2 rounded-md text-base font-medium transition-colors ${
-                      isActive('/dashboard/user') ? 'text-blue-700 bg-blue-50' : 'text-gray-700 hover:text-blue-600 hover:bg-gray-50'
+                      isActive('/dashboard') ? 'text-blue-700 bg-blue-50' : 'text-gray-700 hover:text-blue-600 hover:bg-gray-50'
                     }`}
                     onClick={() => setIsMobileMenuOpen(false)}
                   >
@@ -262,16 +230,16 @@ export default function Navigation() {
               ) : mounted && (
                 <div className="space-y-1">
                   <Link 
-                    href="/auth/login" 
+                    href="/login" 
                     className={`block px-3 py-2 rounded-md text-base font-medium transition-colors ${
-                      isActive('/auth/login') ? 'text-blue-700 bg-blue-50' : 'text-gray-700 hover:text-blue-600 hover:bg-gray-50'
+                      isActive('/login') ? 'text-blue-700 bg-blue-50' : 'text-gray-700 hover:text-blue-600 hover:bg-gray-50'
                     }`}
                     onClick={() => setIsMobileMenuOpen(false)}
                   >
                     Login
                   </Link>
                   <Link 
-                    href="/auth/signup" 
+                    href="/signup" 
                     className="block px-3 py-2 rounded-md text-base font-medium bg-blue-600 text-white hover:bg-blue-700 transition-colors mx-3"
                     onClick={() => setIsMobileMenuOpen(false)}
                   >

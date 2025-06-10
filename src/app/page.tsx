@@ -1,6 +1,3 @@
-// import MapClientWrapper from '../components/map/mapClientWrapper';
-// import EventList from '../components/common/eventsList'
-
 import { Metadata } from 'next';
 import Link from 'next/link';
 

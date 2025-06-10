@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from 'react';
-import { supabase } from '../../lib/supabase/supabaseClient';
+import { supabase } from '../../lib/supabaseClient';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
@@ -27,7 +27,7 @@ export default function SignUp() {
           data: {
             full_name: fullName,
           },
-          emailRedirectTo: `${window.location.origin}/auth/login`
+          emailRedirectTo: `${window.location.origin}/login`
         },
       });
 
@@ -56,7 +56,7 @@ export default function SignUp() {
 
       // User created successfully
       alert('Check your email for the confirmation link!');
-      router.push('/auth/login');
+      router.push('/login');
     } catch (error: any) {
       setError(error.message || 'An error occurred during sign up');
     } finally {
@@ -130,7 +130,7 @@ export default function SignUp() {
         
         <p className="mt-4 text-center text-sm">
           Already have an account?{' '}
-          <Link href="/auth/login" className="text-blue-600 hover:underline">
+          <Link href="/login" className="text-blue-600 hover:underline">
             Log in
           </Link>
         </p>
