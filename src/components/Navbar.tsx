@@ -5,6 +5,11 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '../context/AuthProvider';
 import { getUserRole } from '../lib/auth';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { Menu, X } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 export default function Navbar() {
   const { user: authUser, isLoading: authLoading, signOut } = useAuth();
@@ -33,221 +38,158 @@ export default function Navbar() {
   // Check which page is user on
   const isActive = (path: string) => pathname === path;
 
-  // Set mobile menu open to true or false
-  const toggleMobileMenu = () => {
-    setIsMobileMenuOpen(!isMobileMenuOpen);
-  };
+  // Navigation items
+  const navigationItems = [
+    { href: '/', label: 'Home' },
+    { href: '/events', label: 'Events Map' },
+  ];
 
-  // Always render the nav structure to prevent hydration mismatch
+  const NavLink = ({ href, children, mobile = false }: { href: string; children: React.ReactNode; mobile?: boolean }) => (
+    <Link 
+      href={href}
+      className={cn(
+        mobile ? "block px-3 py-2 text-base font-medium" : "px-3 py-2 text-sm font-medium",
+        "rounded-md transition-colors",
+        isActive(href) 
+          ? "text-primary bg-primary/10" 
+          : "text-foreground hover:text-primary hover:bg-accent"
+      )}
+      onClick={mobile ? () => setIsMobileMenuOpen(false) : undefined}
+    >
+      {children}
+    </Link>
+  );
+
   return (
-    <nav className="bg-white shadow">
+    <nav className="bg-background border-b border-border shadow-sm">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
-          {/* Logo and hamburger button container */}
+          {/* Logo */}
           <div className="flex items-center">
             <div className="flex-shrink-0">
-              <Link href="/" className="text-xl font-bold text-blue-600">
+              <Link href="/" className="text-xl font-bold text-primary">
                 EventScapeSG
               </Link>
             </div>
             
             {/* Desktop navigation */}
             <div className="hidden md:ml-6 md:flex md:items-center md:space-x-4">
-              <Link 
-                href="/" 
-                className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                  isActive('/') ? 'text-blue-700 bg-blue-50' : 'text-gray-700 hover:text-blue-600'
-                }`}
-              >
-                Home
-              </Link>
-              
-              <Link 
-                href="/events" 
-                className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                  isActive('/events') ? 'text-blue-700 bg-blue-50' : 'text-gray-700 hover:text-blue-600'
-                }`}
-              >
-                Events Map
-              </Link>
+              {navigationItems.map((item) => (
+                <NavLink key={item.href} href={item.href}>
+                  {item.label}
+                </NavLink>
+              ))}
               
               {/* AI Event Planning - Coming Soon */}
-              <span className="px-3 py-2 rounded-md text-sm font-medium text-gray-400 cursor-not-allowed relative group">
+              <div className="px-3 py-2 rounded-md text-sm font-medium text-muted-foreground cursor-not-allowed relative group">
                 AI Event Planning
-                <span className="ml-2 text-xs bg-gray-200 text-gray-600 px-2 py-1 rounded-full">
+                <Badge variant="secondary" className="ml-2 text-xs">
                   Coming Soon
-                </span>
-                <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 px-2 py-1 bg-gray-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
+                </Badge>
+                <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 px-2 py-1 bg-popover text-popover-foreground text-xs rounded border shadow-md opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
                   AI-powered itinerary planning
                 </div>
-              </span>
+              </div>
               
               {mounted && authUser && (
-                <>
-                  <Link 
-                    href="/dashboard" 
-                    className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                      isActive('/dashboard') ? 'text-blue-700 bg-blue-50' : 'text-gray-700 hover:text-blue-600'
-                    }`}
-                  >
-                    Dashboard
-                  </Link> 
-                </>
+                <NavLink href="/dashboard">
+                  Dashboard
+                </NavLink>
               )}
             </div>
           </div>
           
           {/* Desktop auth buttons */}
-          <div className="hidden md:flex md:items-center">
+          <div className="hidden md:flex md:items-center md:space-x-2">
             {mounted && authUser ? (
-              <button
+              <Button
+                variant="ghost"
                 onClick={handleSignOut}
-                className="ml-4 px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100 transition-colors"
+                className="text-foreground hover:text-primary"
               >
                 Sign Out
-              </button>
+              </Button>
             ) : mounted && (
-              <div className="space-x-2">
-                <Link 
-                  href="/login" 
-                  className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                    isActive('/login') ? 'text-blue-700 bg-blue-50' : 'text-gray-700 hover:text-blue-600'
-                  }`}
-                >
-                  Login
-                </Link>
-                <Link 
-                  href="/signup" 
-                  className="px-3 py-2 rounded-md text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 transition-colors"
-                >
-                  Sign Up
-                </Link>
-              </div>
-            )}
-          </div>
-
-          {/* Mobile menu button */}
-          <div className="md:hidden flex items-center">
-            <button
-              onClick={toggleMobileMenu}
-              className="inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500 transition-colors"
-              aria-expanded="false"
-            >
-              <span className="sr-only">Open main menu</span>
-              {/* Hamburger icon */}
-              <svg 
-                className={`${isMobileMenuOpen ? 'hidden' : 'block'} h-6 w-6`} 
-                xmlns="http://www.w3.org/2000/svg" 
-                fill="none" 
-                viewBox="0 0 24 24" 
-                stroke="currentColor"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-              </svg>
-              {/* Close icon */}
-              <svg 
-                className={`${isMobileMenuOpen ? 'block' : 'hidden'} h-6 w-6`} 
-                xmlns="http://www.w3.org/2000/svg" 
-                fill="none" 
-                viewBox="0 0 24 24" 
-                stroke="currentColor"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-        </div>
-
-        {/* Mobile menu */}
-        <div className={`${isMobileMenuOpen ? 'block' : 'hidden'} md:hidden`}>
-          <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3 border-t border-gray-200">
-            <Link 
-              href="/" 
-              className={`block px-3 py-2 rounded-md text-base font-medium transition-colors ${
-                isActive('/') ? 'text-blue-700 bg-blue-50' : 'text-gray-700 hover:text-blue-600 hover:bg-gray-50'
-              }`}
-              onClick={() => setIsMobileMenuOpen(false)}
-            >
-              Home
-            </Link>
-            
-            <Link 
-              href="/events" 
-              className={`block px-3 py-2 rounded-md text-base font-medium transition-colors ${
-                isActive('/events') ? 'text-blue-700 bg-blue-50' : 'text-gray-700 hover:text-blue-600 hover:bg-gray-50'
-              }`}
-              onClick={() => setIsMobileMenuOpen(false)}
-            >
-              Events Map
-            </Link>
-            
-            {/* AI Event Planning - Coming Soon (Mobile) */}
-            <div className="px-3 py-2 rounded-md text-base font-medium text-gray-400">
-              AI Event Planning
-              <span className="ml-2 text-xs bg-gray-200 text-gray-600 px-2 py-1 rounded-full">
-                Coming Soon
-              </span>
-            </div>
-            
-            {mounted && authUser && (
               <>
-                {role === 'admin' ? (
-                  <Link 
-                    href="/dashboard" 
-                    className={`block px-3 py-2 rounded-md text-base font-medium transition-colors ${
-                      isActive('/dashboard') ? 'text-blue-700 bg-blue-50' : 'text-gray-700 hover:text-blue-600 hover:bg-gray-50'
-                    }`}
-                    onClick={() => setIsMobileMenuOpen(false)}
-                  >
-                    Admin Dashboard
-                  </Link>
-                ) : (
-                  <Link 
-                    href="/dashboard" 
-                    className={`block px-3 py-2 rounded-md text-base font-medium transition-colors ${
-                      isActive('/dashboard') ? 'text-blue-700 bg-blue-50' : 'text-gray-700 hover:text-blue-600 hover:bg-gray-50'
-                    }`}
-                    onClick={() => setIsMobileMenuOpen(false)}
-                  >
-                    Dashboard
-                  </Link>
-                )}
-              </>
-            )}
-
-            {/* Mobile auth section */}
-            <div className="border-t border-gray-200 pt-4">
-              {mounted && authUser ? (
-                <button
-                  onClick={() => {
-                    handleSignOut();
-                    setIsMobileMenuOpen(false);
-                  }}
-                  className="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:bg-gray-100 transition-colors"
-                >
-                  Sign Out
-                </button>
-              ) : mounted && (
-                <div className="space-y-1">
-                  <Link 
-                    href="/login" 
-                    className={`block px-3 py-2 rounded-md text-base font-medium transition-colors ${
-                      isActive('/login') ? 'text-blue-700 bg-blue-50' : 'text-gray-700 hover:text-blue-600 hover:bg-gray-50'
-                    }`}
-                    onClick={() => setIsMobileMenuOpen(false)}
-                  >
-                    Login
-                  </Link>
-                  <Link 
-                    href="/signup" 
-                    className="block px-3 py-2 rounded-md text-base font-medium bg-blue-600 text-white hover:bg-blue-700 transition-colors mx-3"
-                    onClick={() => setIsMobileMenuOpen(false)}
-                  >
+                <NavLink href="/login">
+                  Login
+                </NavLink>
+                <Button asChild>
+                  <Link href="/signup">
                     Sign Up
                   </Link>
+                </Button>
+              </>
+            )}
+          </div>
+
+          {/* Mobile menu */}
+          <div className="md:hidden flex items-center">
+            <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon" className="text-foreground">
+                  <Menu className="h-6 w-6" />
+                  <span className="sr-only">Open main menu</span>
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="right" className="w-[300px] sm:w-[400px]">
+                <div className="flex flex-col space-y-4 mt-6">
+                  <div className="text-lg font-semibold text-primary mb-4">
+                    EventScapeSG
+                  </div>
+                  
+                  {navigationItems.map((item) => (
+                    <NavLink key={item.href} href={item.href} mobile>
+                      {item.label}
+                    </NavLink>
+                  ))}
+                  
+                  {/* AI Event Planning - Coming Soon (Mobile) */}
+                  <div className="px-3 py-2 rounded-md text-base font-medium text-muted-foreground">
+                    AI Event Planning
+                    <Badge variant="secondary" className="ml-2 text-xs">
+                      Coming Soon
+                    </Badge>
+                  </div>
+                  
+                  {mounted && authUser && (
+                    <NavLink href="/dashboard" mobile>
+                      {role === 'admin' ? 'Admin Dashboard' : 'Dashboard'}
+                    </NavLink>
+                  )}
+
+                  {/* Mobile auth section */}
+                  <div className="border-t border-border pt-4 mt-4">
+                    {mounted && authUser ? (
+                      <Button
+                        variant="ghost"
+                        onClick={() => {
+                          handleSignOut();
+                          setIsMobileMenuOpen(false);
+                        }}
+                        className="w-full justify-start text-foreground hover:text-primary"
+                      >
+                        Sign Out
+                      </Button>
+                    ) : mounted && (
+                      <div className="space-y-2">
+                        <NavLink href="/login" mobile>
+                          Login
+                        </NavLink>
+                        <Button asChild className="w-full">
+                          <Link 
+                            href="/signup"
+                            onClick={() => setIsMobileMenuOpen(false)}
+                          >
+                            Sign Up
+                          </Link>
+                        </Button>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              )}
-            </div>
+              </SheetContent>
+            </Sheet>
           </div>
         </div>
       </div>

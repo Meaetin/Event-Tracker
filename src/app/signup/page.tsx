@@ -4,6 +4,12 @@ import { FormEvent, useState } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { AlertCircle, Loader2, CheckCircle } from 'lucide-react';
 
 export default function SignUp() {
   const [email, setEmail] = useState('');
@@ -11,6 +17,7 @@ export default function SignUp() {
   const [fullName, setFullName] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
   const router = useRouter();
 
   const handleSignUp = async (e: FormEvent) => {
@@ -50,13 +57,17 @@ export default function SignUp() {
           // Only show the error to user if it's not a duplicate key violation
           if (profileError.code !== '23505') {
             setError(`Error creating profile: ${profileError.message}`);
+            setLoading(false);
+            return;
           }
         }
       }
 
       // User created successfully
-      alert('Check your email for the confirmation link!');
-      router.push('/login');
+      setSuccess(true);
+      setTimeout(() => {
+        router.push('/login');
+      }, 3000);
     } catch (error: any) {
       setError(error.message || 'An error occurred during sign up');
     } finally {
@@ -64,77 +75,114 @@ export default function SignUp() {
     }
   };
 
-  return (
-    <div className="flex min-h-screen flex-col items-center justify-center p-4">
-      <div className="w-full max-w-md p-6 bg-white rounded-lg shadow-md">
-        <h1 className="text-2xl font-bold mb-6 text-center">Create an Account</h1>
-        
-        {error && (
-          <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-md">
-            {error}
-          </div>
-        )}
-        
-        <form onSubmit={handleSignUp}>
-          <div className="mb-4">
-            <label htmlFor="fullName" className="block text-sm font-medium mb-1">
-              Full Name
-            </label>
-            <input
-              id="fullName"
-              type="text"
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              className="w-full p-2 border rounded-md"
-              required
-            />
-          </div>
-          
-          <div className="mb-4">
-            <label htmlFor="email" className="block text-sm font-medium mb-1">
-              Email
-            </label>
-            <input
-              id="email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full p-2 border rounded-md"
-              required
-            />
-          </div>
-          
-          <div className="mb-6">
-            <label htmlFor="password" className="block text-sm font-medium mb-1">
-              Password
-            </label>
-            <input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full p-2 border rounded-md"
-              required
-              minLength={6}
-            />
-          </div>
-          
-          <button
-            type="submit"
-            className="w-full p-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
-            disabled={loading}
-          >
-            {loading ? 'Creating account...' : 'Sign Up'}
-          </button>
-        </form>
-        
-        <p className="mt-4 text-center text-sm">
-          Already have an account?{' '}
-          <Link href="/login" className="text-blue-600 hover:underline">
-            Log in
-          </Link>
-        </p>
+  if (success) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <Card className="w-full max-w-md">
+          <CardContent className="pt-6">
+            <div className="text-center space-y-4">
+              <CheckCircle className="h-12 w-12 text-green-500 mx-auto" />
+              <div>
+                <h2 className="text-xl font-semibold">Check your email!</h2>
+                <p className="text-muted-foreground mt-2">
+                  We&apos;ve sent you a confirmation link. Please check your email and click the link to activate your account.
+                </p>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Redirecting to login page...
+              </p>
+            </div>
+          </CardContent>
+        </Card>
       </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-background p-4">
+      <Card className="w-full max-w-md">
+        <CardHeader className="space-y-1">
+          <CardTitle className="text-2xl font-bold text-center">
+            Create an account
+          </CardTitle>
+          <CardDescription className="text-center">
+            Join EventScapeSG to discover amazing events
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {error && (
+            <Alert variant="destructive" className="mb-4">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                {error}
+              </AlertDescription>
+            </Alert>
+          )}
+          
+          <form onSubmit={handleSignUp} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="fullName">Full Name</Label>
+              <Input
+                id="fullName"
+                type="text"
+                placeholder="Enter your full name"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                required
+                disabled={loading}
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="Enter your email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                disabled={loading}
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="password">Password</Label>
+              <Input
+                id="password"
+                type="password"
+                placeholder="Create a password (min. 6 characters)"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                minLength={6}
+                disabled={loading}
+              />
+            </div>
+            
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={loading}
+            >
+              {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {loading ? 'Creating account...' : 'Create Account'}
+            </Button>
+          </form>
+          
+          <div className="mt-6 text-center text-sm">
+            <span className="text-muted-foreground">
+              Already have an account?{' '}
+            </span>
+            <Link 
+              href="/login" 
+              className="text-primary hover:text-primary/80 font-medium hover:underline"
+            >
+              Sign in
+            </Link>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 } 
