@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -10,13 +10,83 @@ import {
   CheckCircle, 
   Clock, 
   AlertCircle, 
-  Users, 
   Calendar,
   TrendingUp,
   Database
 } from 'lucide-react';
+import { supabase } from '@/lib/supabaseClient';
 
 export default function AdminDashboard() {
+  // Scraper state
+  const [scrapeUrl, setScrapeUrl] = useState("");
+  const [scrapeLoading, setScrapeLoading] = useState(false);
+  const [scrapeError, setScrapeError] = useState<string | null>(null);
+
+  // Pending and approved listings state
+  const [pendingListings, setPendingListings] = useState<
+    { id: string; title: string; url: string; image_url: string; status: string; created_at: string }[]
+  >([]);
+  const [approvedCount, setApprovedCount] = useState(0);
+  const [loadingListings, setLoadingListings] = useState(true);
+
+  // Fetch pending listings and approved count
+  async function fetchListings() {
+    try {
+      // Fetch pending listings
+      const { data: pending, error: pendingError } = await supabase
+        .from('scraped_listings')
+        .select('*')
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false });
+      
+      if (pendingError) throw pendingError;
+      setPendingListings(pending || []);
+
+      // Fetch approved count
+      const { count, error: countError } = await supabase
+        .from('scraped_listings')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'approved');
+      
+      if (countError) throw countError;
+      setApprovedCount(count || 0);
+    } catch (error) {
+      console.error('Error fetching listings:', error);
+    } finally {
+      setLoadingListings(false);
+    }
+  }
+
+  // Fetch pending listings and approved count on component load
+  useEffect(() => {
+    fetchListings();
+  }, []);
+
+  async function handleScrapeSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setScrapeError(null);
+    setScrapeLoading(true);
+    try {
+      const res = await fetch("/api/scrape", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: scrapeUrl }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Scrape failed");
+      
+      // Refresh listings after successful scrape
+      await fetchListings();
+      
+      // Clear the URL input after successful scrape
+      setScrapeUrl("");
+    } catch (err: any) {
+      setScrapeError(err.message || "Unknown error");
+    } finally {
+      setScrapeLoading(false);
+    }
+  }
+
   return (
     <div className="min-h-screen bg-background p-4 md:p-6 lg:p-8">
       <div className="max-w-7xl mx-auto space-y-6">
@@ -55,22 +125,22 @@ export default function AdminDashboard() {
               <Clock className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">23</div>
+              <div className="text-2xl font-bold">{pendingListings.length}</div>
               <p className="text-xs text-muted-foreground">
-                Requires attention
+                Scraped listings awaiting review
               </p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Active Users</CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium">Approved Listings</CardTitle>
+              <CheckCircle className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">892</div>
+              <div className="text-2xl font-bold">{approvedCount}</div>
               <p className="text-xs text-muted-foreground">
-                +5% from last week
+                Ready for processing
               </p>
             </CardContent>
           </Card>
@@ -107,55 +177,108 @@ export default function AdminDashboard() {
           </TabsList>
 
           <TabsContent value="scrape" className="space-y-4">
+            {/* Scraper Form */}
             <Card>
               <CardHeader>
-                <CardTitle>Event Scraping</CardTitle>
-                <CardDescription>
-                  Scrape events from various sources and add them to the database
-                </CardDescription>
+                <CardTitle>Scrape a Website for Events</CardTitle>
+                <CardDescription>Enter a URL to scrape event data using Puppeteer.</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-lg">Last Scrape</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-2">
-                        <p className="text-sm text-muted-foreground">
-                          <span className="font-medium">Date:</span> Dec 10, 2024 14:30
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                          <span className="font-medium">Events Found:</span> 45 new events
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                          <span className="font-medium">Status:</span> 
-                          <Badge variant="secondary" className="ml-2">Completed</Badge>
-                        </p>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-lg">Quick Actions</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-2">
-                      <Button className="w-full">
+              <CardContent>
+                {/* Error box above input */}
+                {scrapeError && (
+                  <div className="mb-4 p-3 rounded border border-red-400 bg-red-100 text-red-800 text-sm font-medium">
+                    {scrapeError}
+                  </div>
+                )}
+                <form onSubmit={handleScrapeSubmit} className="flex flex-col gap-4 md:flex-row md:items-end">
+                  <div className="flex-1">
+                    <label htmlFor="scrape-url" className="block text-sm font-medium mb-1">Event Source URL</label>
+                    <input
+                      id="scrape-url"
+                      type="url"
+                      required
+                      value={scrapeUrl}
+                      onChange={e => setScrapeUrl(e.target.value)}
+                      placeholder="https://example.com/events"
+                      className="w-full px-3 py-2 border rounded-md bg-background text-foreground"
+                    />
+                  </div>
+                  <Button type="submit" className="mt-2 md:mt-0" disabled={scrapeLoading}>
+                    {scrapeLoading ? (
+                      <>
+                        <Search className="w-4 h-4 mr-2 animate-spin" />
+                        Scraping...
+                      </>
+                    ) : (
+                      <>
                         <Search className="w-4 h-4 mr-2" />
-                        Start New Scrape
-                      </Button>
-                      <Button variant="outline" className="w-full">
-                        View Scrape History
-                      </Button>
-                      <Button variant="outline" className="w-full">
-                        Configure Sources
-                      </Button>
-                    </CardContent>
-                  </Card>
-                </div>
+                        Scrape
+                      </>
+                    )}
+                  </Button>
+                </form>
               </CardContent>
             </Card>
+
+            {/* Pending Listings Section */}
+            {loadingListings ? (
+              <Card>
+                <CardContent className="p-6">
+                  <div className="text-center">Loading pending listings...</div>
+                </CardContent>
+              </Card>
+            ) : (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Pending Scraped Listings ({pendingListings.length})</CardTitle>
+                  <CardDescription>
+                    Review and approve scraped events before they go live
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {pendingListings.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      No pending listings found. Scrape some websites to get started!
+                    </div>
+                  ) : (
+                    <div className="grid gap-6">
+                      {pendingListings.map(item => (
+                        <div key={item.id} className="rounded-xl border p-4 flex gap-6 bg-white shadow-sm">
+                          <div className="flex-shrink-0">
+                            {item.image_url ? (
+                              <img src={item.image_url} alt={item.title} className="w-60 h-32 object-cover rounded-lg" />
+                            ) : (
+                              <div className="w-40 h-28 bg-gray-200 rounded-lg flex items-center justify-center text-gray-400">No Image</div>
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-start gap-2 mb-1">
+                              <div className="flex-1">
+                                <h3 className="font-bold text-xl leading-tight mb-1" title={item.title}>{item.title}</h3>
+                                <span className="inline-block px-2 py-1 rounded text-xs font-semibold bg-yellow-100 text-yellow-800">
+                                  pending
+                                </span>
+                              </div>
+                              <div className="flex gap-2 ml-4">
+                                <button className="bg-red-600 text-white px-4 py-2 rounded font-semibold hover:bg-red-700 transition">Reject</button>
+                                <button className="bg-green-600 text-white px-4 py-2 rounded font-semibold hover:bg-green-700 transition">Approve for Processing</button>
+                              </div>
+                            </div>
+                            <div className="text-sm mb-1">
+                              Source: <a href={item.url} className="text-blue-600 underline break-all" target="_blank" rel="noopener noreferrer">{item.url}</a>
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              Added: {item.created_at ? new Date(item.created_at).toLocaleString() : '-'}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+            
           </TabsContent>
 
           <TabsContent value="review" className="space-y-4">
