@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { supabase } from '@/lib/supabaseClient';
 import { 
   Search, 
   CheckCircle, 
@@ -14,7 +15,6 @@ import {
   TrendingUp,
   Database
 } from 'lucide-react';
-import { supabase } from '@/lib/supabaseClient';
 
 export default function AdminDashboard() {
   // Scraper state
@@ -27,7 +27,12 @@ export default function AdminDashboard() {
     { id: string; title: string; url: string; image_url: string; status: string; created_at: string }[]
   >([]);
   const [approvedCount, setApprovedCount] = useState(0);
+  const [processingQueue, setProcessingQueue] = useState<
+    { id: string; title: string; url: string; image_url: string; status: string; created_at: string; queued_for_processing: boolean; processing_status: string; processed_at: string }[]
+  >([]);
   const [loadingListings, setLoadingListings] = useState(true);
+  const [processingItems, setProcessingItems] = useState<Set<string>>(new Set());
+  const [queueProcessing, setQueueProcessing] = useState(false);
 
   // Fetch pending listings and approved count
   async function fetchListings() {
@@ -42,6 +47,16 @@ export default function AdminDashboard() {
       if (pendingError) throw pendingError;
       setPendingListings(pending || []);
 
+      // Fetch approved items (for processing queue view)
+      const { data: approved, error: approvedError } = await supabase
+        .from('scraped_listings')
+        .select('*')
+        .eq('status', 'approved')
+        .order('created_at', { ascending: false });
+      
+      if (approvedError) throw approvedError;
+      setProcessingQueue(approved || []);
+
       // Fetch approved count
       const { count, error: countError } = await supabase
         .from('scraped_listings')
@@ -54,6 +69,70 @@ export default function AdminDashboard() {
       console.error('Error fetching listings:', error);
     } finally {
       setLoadingListings(false);
+    }
+  }
+
+  // Handle approve action
+  async function handleApprove(itemId: string) {
+    setProcessingItems(prev => new Set(prev).add(itemId));
+    try {
+      const { error } = await supabase
+        .from('scraped_listings')
+        .update({ 
+          status: 'approved',
+          queued_for_processing: true
+        })
+        .eq('id', itemId);
+      
+      if (error) throw error;
+      
+      // Refresh listings after successful update
+      await fetchListings();
+      
+      // Trigger background processing
+      try {
+        await fetch('/api/process-queue', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        });
+      } catch (processError) {
+        console.error('Error triggering queue processing:', processError);
+        // Don't fail the approval if queue trigger fails
+      }
+    } catch (error) {
+      console.error('Error approving item:', error);
+      
+    } finally {
+      setProcessingItems(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(itemId);
+        return newSet;
+      });
+    }
+  }
+
+  // Handle reject action
+  async function handleReject(itemId: string) {
+    setProcessingItems(prev => new Set(prev).add(itemId));
+    try {
+      const { error } = await supabase
+        .from('scraped_listings')
+        .update({ status: 'rejected' })
+        .eq('id', itemId);
+      
+      if (error) throw error;
+      
+      // Refresh listings after successful update
+      await fetchListings();
+    } catch (error) {
+      console.error('Error rejecting item:', error);
+      // You could add a toast notification here
+    } finally {
+      setProcessingItems(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(itemId);
+        return newSet;
+      });
     }
   }
 
@@ -84,6 +163,29 @@ export default function AdminDashboard() {
       setScrapeError(err.message || "Unknown error");
     } finally {
       setScrapeLoading(false);
+    }
+  }
+
+  // Manual queue processing trigger
+  async function triggerQueueProcessing() {
+    setQueueProcessing(true);
+    try {
+      const response = await fetch('/api/process-queue', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Queue processing failed');
+      }
+      
+      // Refresh listings after processing
+      await fetchListings();
+    } catch (error) {
+      console.error('Error triggering queue processing:', error);
+    } finally {
+      setQueueProcessing(false);
     }
   }
 
@@ -134,26 +236,26 @@ export default function AdminDashboard() {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Approved Listings</CardTitle>
-              <CheckCircle className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium">Processing Queue</CardTitle>
+              <Clock className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{approvedCount}</div>
+              <div className="text-2xl font-bold">{processingQueue.filter(item => item.queued_for_processing).length}</div>
               <p className="text-xs text-muted-foreground">
-                Ready for processing
+                Items waiting to be processed
               </p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">System Health</CardTitle>
-              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium">Approved Listings</CardTitle>
+              <CheckCircle className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">98.5%</div>
+              <div className="text-2xl font-bold">{approvedCount}</div>
               <p className="text-xs text-muted-foreground">
-                Uptime this month
+                Total approved items
               </p>
             </CardContent>
           </Card>
@@ -242,37 +344,52 @@ export default function AdminDashboard() {
                     </div>
                   ) : (
                     <div className="grid gap-6">
-                      {pendingListings.map(item => (
-                        <div key={item.id} className="rounded-xl border p-4 flex gap-6 bg-white shadow-sm">
-                          <div className="flex-shrink-0">
-                            {item.image_url ? (
-                              <img src={item.image_url} alt={item.title} className="w-60 h-32 object-cover rounded-lg" />
-                            ) : (
-                              <div className="w-40 h-28 bg-gray-200 rounded-lg flex items-center justify-center text-gray-400">No Image</div>
-                            )}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-start gap-2 mb-1">
-                              <div className="flex-1">
-                                <h3 className="font-bold text-xl leading-tight mb-1" title={item.title}>{item.title}</h3>
-                                <span className="inline-block px-2 py-1 rounded text-xs font-semibold bg-yellow-100 text-yellow-800">
-                                  pending
-                                </span>
+                      {pendingListings.map(item => {
+                        const isProcessing = processingItems.has(item.id);
+                        return (
+                          <div key={item.id} className="rounded-xl border p-4 flex gap-6 bg-white shadow-sm">
+                            <div className="flex-shrink-0">
+                              {item.image_url ? (
+                                <img src={item.image_url} alt={item.title} className="w-60 h-32 object-cover rounded-lg" />
+                              ) : (
+                                <div className="w-40 h-28 bg-gray-200 rounded-lg flex items-center justify-center text-gray-400">No Image</div>
+                              )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-start gap-2 mb-1">
+                                <div className="flex-1">
+                                  <h3 className="font-bold text-xl leading-tight mb-1" title={item.title}>{item.title}</h3>
+                                  <span className="inline-block px-2 py-1 rounded text-xs font-semibold bg-yellow-100 text-yellow-800">
+                                    pending
+                                  </span>
+                                </div>
+                                <div className="flex gap-2 ml-4">
+                                  <button 
+                                    onClick={() => handleReject(item.id)}
+                                    disabled={isProcessing}
+                                    className="bg-red-600 text-white px-4 py-2 rounded font-semibold hover:bg-red-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                                  >
+                                    {isProcessing ? 'Processing...' : 'Reject'}
+                                  </button>
+                                  <button 
+                                    onClick={() => handleApprove(item.id)}
+                                    disabled={isProcessing}
+                                    className="bg-green-600 text-white px-4 py-2 rounded font-semibold hover:bg-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                                  >
+                                    {isProcessing ? 'Processing...' : 'Approve for Processing'}
+                                  </button>
+                                </div>
                               </div>
-                              <div className="flex gap-2 ml-4">
-                                <button className="bg-red-600 text-white px-4 py-2 rounded font-semibold hover:bg-red-700 transition">Reject</button>
-                                <button className="bg-green-600 text-white px-4 py-2 rounded font-semibold hover:bg-green-700 transition">Approve for Processing</button>
+                              <div className="text-sm mb-1">
+                                Source: <a href={item.url} className="text-blue-600 underline break-all" target="_blank" rel="noopener noreferrer">{item.url}</a>
+                              </div>
+                              <div className="text-xs text-gray-500">
+                                Added: {item.created_at ? new Date(item.created_at).toLocaleString() : '-'}
                               </div>
                             </div>
-                            <div className="text-sm mb-1">
-                              Source: <a href={item.url} className="text-blue-600 underline break-all" target="_blank" rel="noopener noreferrer">{item.url}</a>
-                            </div>
-                            <div className="text-xs text-gray-500">
-                              Added: {item.created_at ? new Date(item.created_at).toLocaleString() : '-'}
-                            </div>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </CardContent>
@@ -368,60 +485,84 @@ export default function AdminDashboard() {
           <TabsContent value="approved" className="space-y-4">
             <Card>
               <CardHeader>
-                <CardTitle>Approved Events</CardTitle>
-                <CardDescription>
-                  Events that have been reviewed and approved for publication
-                </CardDescription>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Processing Queue & Approved Events</CardTitle>
+                    <CardDescription>
+                      Track the processing status of approved events
+                    </CardDescription>
+                  </div>
+                  <Button 
+                    onClick={triggerQueueProcessing}
+                    disabled={queueProcessing || processingQueue.filter(item => item.queued_for_processing).length === 0}
+                    className="ml-4"
+                  >
+                    {queueProcessing ? (
+                      <>
+                        <Clock className="w-4 h-4 mr-2 animate-spin" />
+                        Processing...
+                      </>
+                    ) : (
+                      <>
+                        <Database className="w-4 h-4 mr-2" />
+                        Process Queue ({processingQueue.filter(item => item.queued_for_processing).length})
+                      </>
+                    )}
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {/* Sample approved events */}
-                  <div className="flex items-center justify-between p-4 border border-border rounded-lg">
-                    <div className="flex items-center space-x-4">
-                      <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
-                        <Calendar className="w-6 h-6 text-primary" />
-                      </div>
-                      <div>
-                        <p className="font-medium text-foreground">
-                          Singapore Art Exhibition
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                          National Gallery • Dec 15-30, 2024
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Badge>
-                        <CheckCircle className="w-3 h-3 mr-1" />
-                        Live
-                      </Badge>
-                      <Button size="sm" variant="outline">Edit</Button>
-                    </div>
+                {loadingListings ? (
+                  <div className="text-center py-8">Loading approved items...</div>
+                ) : processingQueue.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    No approved items found. Approve some pending listings to see them here!
                   </div>
+                ) : (
+                  <div className="space-y-4">
+                    {processingQueue.map(item => {
+                      const getStatusBadge = () => {
+                        if (item.queued_for_processing) {
+                          return <Badge variant="outline" className="bg-yellow-100 text-yellow-800">Queued</Badge>;
+                        } else if (item.processing_status === 'completed') {
+                          return <Badge className="bg-green-100 text-green-800">Completed</Badge>;
+                        } else if (item.processing_status === 'failed') {
+                          return <Badge variant="destructive">Failed</Badge>;
+                        } else if (item.processing_status === 'processing') {
+                          return <Badge variant="outline" className="bg-blue-100 text-blue-800">Processing</Badge>;
+                        }
+                        return <Badge>Approved</Badge>;
+                      };
 
-                  <div className="flex items-center justify-between p-4 border border-border rounded-lg">
-                    <div className="flex items-center space-x-4">
-                      <div className="w-12 h-12 bg-secondary/50 rounded-lg flex items-center justify-center">
-                        <Calendar className="w-6 h-6 text-secondary-foreground" />
-                      </div>
-                      <div>
-                        <p className="font-medium text-foreground">
-                          Night Safari Experience
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                          Singapore Zoo • Ongoing
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Badge>
-                        <CheckCircle className="w-3 h-3 mr-1" />
-                        Live
-                      </Badge>
-                      <Button size="sm" variant="outline">Edit</Button>
-                    </div>
+                      return (
+                        <div key={item.id} className="flex items-center justify-between p-4 border border-border rounded-lg">
+                          <div className="flex items-center space-x-4">
+                            <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
+                              <Calendar className="w-6 h-6 text-primary" />
+                            </div>
+                            <div>
+                              <p className="font-medium text-foreground">{item.title}</p>
+                              <p className="text-sm text-muted-foreground">
+                                {item.url}
+                              </p>
+                              {item.processed_at && (
+                                <p className="text-xs text-muted-foreground">
+                                  Processed: {new Date(item.processed_at).toLocaleString()}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            {getStatusBadge()}
+                            {item.processing_status === 'completed' && (
+                              <Button size="sm" variant="outline">View Details</Button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
-                </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
