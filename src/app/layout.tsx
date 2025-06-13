@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import Navbar from '../components/Navbar';
 import { AuthProvider } from '../context/AuthProvider';
+import { ThemeProvider } from '../components/theme-provider';
 import { Suspense } from 'react';
 import { StagewiseToolbar } from '@stagewise/toolbar-next';
 
@@ -32,16 +33,23 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
-        <AuthProvider>
-          <Suspense fallback={<LoadingSpinner />}>
-            <Navbar />
-            <main>
-              {children}
-            </main>
-          </Suspense>
-        </AuthProvider>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <AuthProvider>
+            <Suspense fallback={<LoadingSpinner />}>
+              <Navbar />
+              <main>
+                {children}
+              </main>
+            </Suspense>
+          </AuthProvider>
+        </ThemeProvider>
         {process.env.NODE_ENV === 'development' && (
           <StagewiseToolbar config={{ plugins: [] }} />
         )}

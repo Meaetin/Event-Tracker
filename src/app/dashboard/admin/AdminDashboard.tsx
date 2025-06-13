@@ -1,25 +1,38 @@
-import { Button, HStack } from "@chakra-ui/react"
+"use client";
+
+import { useState } from "react";
 
 export default function AdminDashboard() {
-
-
+  const [activeView, setActiveView] = useState('scrape');
 
 
   return (
     <>
-    <HStack>
-      <Button>Click me</Button>
-      <Button>Click me</Button>
-    </HStack>
-    <div className="title-container container mx-auto px-4 py-8">
+    <div className="container flex items-center flex-col">
       <h1 className="text-2xl font-bold">Admin Dashboard</h1>
-    </div>
 
-    <div className="events-container container w-vw mx-auto px-4 py-8 bg-white shadow rounded-lg p-6 mb-6">
-      <h2 className="text-xl font-bold">Event Management</h2>
-      <div className="listings-container bg-white shadow rounded-lg p-6 mb-6">hello</div>
+      {/* Scrape Content */}
+      <div className="flex items-center gap-4 py-4">
+        <button className={`py-2 px-6 transition-colors ${
+              activeView === 'scrape' 
+                ? 'border-b-2 border-blue-500 text-blue-500 font-medium' 
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+            onClick={() => setActiveView('scrape')}>Scrape Events</button>
+        <button className={`py-2 px-6 transition-colors ${
+              activeView === 'review' 
+                ? 'border-b-2 border-blue-500 text-blue-500 font-medium' 
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+            onClick={() => setActiveView('review')}>Review Events</button>
+        <button className={`py-2 px-6 transition-colors ${
+              activeView === 'approved' 
+                ? 'border-b-2 border-blue-500 text-blue-500 font-medium' 
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+            onClick={() => setActiveView('approved')}>Approved Events</button>
+      </div>
     </div>
-
     </>
   );
 }
