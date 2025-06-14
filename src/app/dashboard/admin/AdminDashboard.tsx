@@ -12,7 +12,6 @@ import {
   Clock, 
   AlertCircle, 
   Calendar,
-  TrendingUp,
   Database
 } from 'lucide-react';
 
@@ -28,11 +27,12 @@ export default function AdminDashboard() {
   >([]);
   const [approvedCount, setApprovedCount] = useState(0);
   const [processingQueue, setProcessingQueue] = useState<
-    { id: string; title: string; url: string; image_url: string; status: string; created_at: string; queued_for_processing: boolean; processing_status: string; processed_at: string }[]
+    { id: string; title: string; url: string; image_url: string; status: string; created_at: string; queued_for_processing: boolean; updated_at: string }[]
   >([]);
   const [loadingListings, setLoadingListings] = useState(true);
   const [processingItems, setProcessingItems] = useState<Set<string>>(new Set());
   const [queueProcessing, setQueueProcessing] = useState(false);
+  const [autoRefresh, setAutoRefresh] = useState(false);
 
   // Fetch pending listings and approved count
   async function fetchListings() {
@@ -47,11 +47,11 @@ export default function AdminDashboard() {
       if (pendingError) throw pendingError;
       setPendingListings(pending || []);
 
-      // Fetch approved items (for processing queue view)
+      // Fetch approved, processed, and error items (for processing queue view)
       const { data: approved, error: approvedError } = await supabase
         .from('scraped_listings')
-        .select('*')
-        .eq('status', 'approved')
+        .select('id, title, url, image_url, status, created_at, queued_for_processing, updated_at')
+        .in('status', ['approved', 'processed', 'error'])
         .order('created_at', { ascending: false });
       
       if (approvedError) throw approvedError;
@@ -136,10 +136,81 @@ export default function AdminDashboard() {
     }
   }
 
+  // Handle retry processing for error items
+  async function handleRetryProcessing(itemId: string) {
+    setProcessingItems(prev => new Set(prev).add(itemId));
+    try {
+      const { error } = await supabase
+        .from('scraped_listings')
+        .update({ 
+          queued_for_processing: true,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', itemId);
+      
+      if (error) throw error;
+      
+      // Refresh listings to show queued status
+      await fetchListings();
+      
+      // Wait a moment for the UI to update, then trigger processing
+      setTimeout(async () => {
+        try {
+          const response = await fetch('/api/process-queue', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+          });
+          
+          if (response.ok) {
+            // Wait a bit then refresh to show updated status
+            setTimeout(async () => {
+              await fetchListings();
+            }, 2000);
+          }
+        } catch (processError) {
+          console.error('Error triggering queue processing:', processError);
+          // Refresh anyway to show current state
+          await fetchListings();
+        }
+      }, 500);
+      
+    } catch (error) {
+      console.error('Error retrying item:', error);
+    } finally {
+      setProcessingItems(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(itemId);
+        return newSet;
+      });
+    }
+  }
+
   // Fetch pending listings and approved count on component load
   useEffect(() => {
     fetchListings();
   }, []);
+
+  // Auto-refresh when there are items being processed
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    
+    const hasQueuedItems = processingQueue.some(item => item.queued_for_processing);
+    
+    if (hasQueuedItems || queueProcessing) {
+      setAutoRefresh(true);
+      interval = setInterval(() => {
+        fetchListings();
+      }, 3000); // Refresh every 3 seconds
+    } else {
+      setAutoRefresh(false);
+    }
+    
+    return () => {
+      if (interval) {
+        clearInterval(interval);
+      }
+    };
+  }, [processingQueue, queueProcessing]);
 
   async function handleScrapeSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -180,10 +251,14 @@ export default function AdminDashboard() {
         throw new Error(data.error || 'Queue processing failed');
       }
       
+      console.log('Queue processing completed:', data);
+      
       // Refresh listings after processing
       await fetchListings();
     } catch (error) {
       console.error('Error triggering queue processing:', error);
+      // Still refresh to show current state
+      await fetchListings();
     } finally {
       setQueueProcessing(false);
     }
@@ -489,7 +564,13 @@ export default function AdminDashboard() {
                   <div>
                     <CardTitle>Processing Queue & Approved Events</CardTitle>
                     <CardDescription>
-                      Track the processing status of approved events
+                      Track FireCrawl scraping and AI processing status of approved events
+                      {autoRefresh && (
+                        <span className="ml-2 inline-flex items-center text-xs text-blue-600">
+                          <Clock className="w-3 h-3 mr-1 animate-spin" />
+                          Auto-refreshing...
+                        </span>
+                      )}
                     </CardDescription>
                   </div>
                   <Button 
@@ -505,7 +586,7 @@ export default function AdminDashboard() {
                     ) : (
                       <>
                         <Database className="w-4 h-4 mr-2" />
-                        Process Queue ({processingQueue.filter(item => item.queued_for_processing).length})
+                        Process with FireCrawl + AI ({processingQueue.filter(item => item.queued_for_processing).length})
                       </>
                     )}
                   </Button>
@@ -523,13 +604,11 @@ export default function AdminDashboard() {
                     {processingQueue.map(item => {
                       const getStatusBadge = () => {
                         if (item.queued_for_processing) {
-                          return <Badge variant="outline" className="bg-yellow-100 text-yellow-800">Queued</Badge>;
-                        } else if (item.processing_status === 'completed') {
-                          return <Badge className="bg-green-100 text-green-800">Completed</Badge>;
-                        } else if (item.processing_status === 'failed') {
-                          return <Badge variant="destructive">Failed</Badge>;
-                        } else if (item.processing_status === 'processing') {
-                          return <Badge variant="outline" className="bg-blue-100 text-blue-800">Processing</Badge>;
+                          return <Badge variant="outline" className="bg-yellow-100 text-yellow-800">Queued for Processing</Badge>;
+                        } else if (item.status === 'processed') {
+                          return <Badge className="bg-green-100 text-green-800">AI Processed</Badge>;
+                        } else if (item.status === 'error') {
+                          return <Badge variant="destructive">Processing Error</Badge>;
                         }
                         return <Badge>Approved</Badge>;
                       };
@@ -545,17 +624,35 @@ export default function AdminDashboard() {
                               <p className="text-sm text-muted-foreground">
                                 {item.url}
                               </p>
-                              {item.processed_at && (
+                              {(item.status === 'processed' || item.status === 'error') && (
                                 <p className="text-xs text-muted-foreground">
-                                  Processed: {new Date(item.processed_at).toLocaleString()}
+                                  {item.status === 'processed' ? 'Processed' : 'Error'}: {new Date(item.updated_at).toLocaleString()}
                                 </p>
                               )}
                             </div>
                           </div>
                           <div className="flex items-center space-x-2">
                             {getStatusBadge()}
-                            {item.processing_status === 'completed' && (
+                            {item.status === 'processed' && (
                               <Button size="sm" variant="outline">View Details</Button>
+                            )}
+                            {item.status === 'error' && !item.queued_for_processing && (
+                              <Button 
+                                size="sm" 
+                                variant="outline"
+                                onClick={() => handleRetryProcessing(item.id)}
+                                disabled={processingItems.has(item.id)}
+                                className="text-orange-600 border-orange-600 hover:bg-orange-50"
+                              >
+                                {processingItems.has(item.id) ? (
+                                  <>
+                                    <Clock className="w-3 h-3 mr-1 animate-spin" />
+                                    Retrying...
+                                  </>
+                                ) : (
+                                  'Retry Processing'
+                                )}
+                              </Button>
                             )}
                           </div>
                         </div>
