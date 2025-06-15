@@ -40,29 +40,6 @@ export default function SignUp() {
 
       if (authError) throw authError;
 
-      // The trigger will automatically create a profile record, 
-      // but we can manually ensure it exists by inserting with "ON CONFLICT DO NOTHING"
-      if (authData.user) {
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .insert({
-            id: authData.user.id,
-            email: email,
-            full_name: fullName,
-            role: 'user'  // Ensure role is set to 'user' by default
-          });
-
-        if (profileError) {
-          console.error('Error creating profile:', profileError);
-          // Only show the error to user if it's not a duplicate key violation
-          if (profileError.code !== '23505') {
-            setError(`Error creating profile: ${profileError.message}`);
-            setLoading(false);
-            return;
-          }
-        }
-      }
-
       // User created successfully
       setSuccess(true);
       setTimeout(() => {

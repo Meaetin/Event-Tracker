@@ -12,7 +12,10 @@ import {
   Clock, 
   AlertCircle, 
   Calendar,
-  Database
+  Database,
+  X,
+  Edit,
+  Eye
 } from 'lucide-react';
 
 export default function AdminDashboard() {
@@ -43,6 +46,14 @@ export default function AdminDashboard() {
   const [directUrl, setDirectUrl] = useState("");
   const [directUrlLoading, setDirectUrlLoading] = useState(false);
   const [directUrlError, setDirectUrlError] = useState<string | null>(null);
+
+  // Event viewing and editing state
+  const [selectedEvent, setSelectedEvent] = useState<any>(null);
+  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editingEvent, setEditingEvent] = useState<any>(null);
+  const [updateLoading, setUpdateLoading] = useState(false);
+  const [updateError, setUpdateError] = useState<string | null>(null);
 
   // Fetch pending listings and approved count
   async function fetchListings() {
@@ -125,7 +136,7 @@ export default function AdminDashboard() {
       try {
         const { data: events, error: eventsError } = await supabase
           .from('events')
-          .select('id, event_name, page_url, image_url, updated_at, start_date, location_text, description')
+          .select('*')
           .order('updated_at', { ascending: false });
         
         if (eventsError) {
@@ -269,6 +280,28 @@ export default function AdminDashboard() {
     fetchListings();
   }, []);
 
+  // Handle Escape key to close modals
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' || event.code === 'Escape') {
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+        
+        if (isViewModalOpen) {
+          closeViewModal();
+          closeEditModal();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown, true);
+
+    // Cleanup event listeners
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown, true);
+    };
+  }, [isViewModalOpen, isEditModalOpen]);
+
   // Auto-refresh when there are items being processed
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -367,6 +400,78 @@ export default function AdminDashboard() {
     } finally {
       setDirectUrlLoading(false);
     }
+  }
+
+  // Handle view event details
+  function handleViewEvent(event: any) {
+    setSelectedEvent(event);
+    setIsViewModalOpen(true);
+    // Focus the modal after a short delay to ensure it's rendered
+    setTimeout(() => {
+      const modal = document.querySelector('[role="dialog"]') as HTMLElement;
+      if (modal) modal.focus();
+    }, 100);
+  }
+
+  // Handle edit event
+  function handleEditEvent(event: any) {
+    setEditingEvent({ ...event });
+    setIsEditModalOpen(true);
+    setUpdateError(null);
+    // Focus the modal after a short delay to ensure it's rendered
+    setTimeout(() => {
+      const modal = document.querySelector('[role="dialog"]') as HTMLElement;
+      if (modal) modal.focus();
+    }, 100);
+  }
+
+  // Handle update event
+  async function handleUpdateEvent(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editingEvent) return;
+    
+    setUpdateLoading(true);
+    setUpdateError(null);
+    
+    try {
+      // Create update object with all editable fields, excluding id and auto-managed fields
+      const updateData = { ...editingEvent };
+      delete updateData.id;
+      updateData.updated_at = new Date().toISOString();
+      
+      const { error } = await supabase
+        .from('events')
+        .update(updateData)
+        .eq('id', editingEvent.id);
+      
+      if (error) {
+        console.error('Supabase error:', error);
+        throw error;
+      }
+      
+      // Refresh events list
+      await fetchListings();
+      
+      // Close modal
+      setIsEditModalOpen(false);
+      setEditingEvent(null);
+    } catch (error: any) {
+      setUpdateError(error.message || "Failed to update event");
+    } finally {
+      setUpdateLoading(false);
+    }
+  }
+
+  // Close modals
+  function closeViewModal() {
+    setIsViewModalOpen(false);
+    setSelectedEvent(null);
+  }
+
+  function closeEditModal() {
+    setIsEditModalOpen(false);
+    setEditingEvent(null);
+    setUpdateError(null);
   }
 
   return (
@@ -903,8 +1008,14 @@ export default function AdminDashboard() {
                               </div>
                             </div>
                             <div className="flex gap-2 ml-4">
-                              <Button size="sm" variant="outline">View Full Details</Button>
-                              <Button size="sm" variant="outline">Edit Event</Button>
+                              <Button size="sm" variant="outline" onClick={() => handleViewEvent(event)}>
+                                <Eye className="w-3 h-3 mr-1" />
+                                View Full Details
+                              </Button>
+                              <Button size="sm" variant="outline" onClick={() => handleEditEvent(event)}>
+                                <Edit className="w-3 h-3 mr-1" />
+                                Edit Event
+                              </Button>
                             </div>
                           </div>
                           <div className="text-sm mb-1">
@@ -922,6 +1033,286 @@ export default function AdminDashboard() {
             </Card>
           </TabsContent>
         </Tabs>
+
+        {/* View Event Details Modal */}
+        {isViewModalOpen && selectedEvent && (
+          <div 
+            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
+            onClick={(e) => {
+              // Close modal when clicking on backdrop
+              if (e.target === e.currentTarget) {
+                closeViewModal();
+              }
+            }}
+            onKeyDown={(e) => {
+              console.log('Modal keydown:', e.key, e.code, e.which);
+              if (e.key === 'Escape' || e.code === 'Escape' || e.which === 27) {
+                e.preventDefault();
+                e.stopPropagation();
+                closeViewModal();
+              }
+            }}
+            tabIndex={-1}
+            role="dialog"
+            aria-modal="true"
+          >
+            <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+              <div className="flex items-center justify-between p-6 border-b">
+                <h2 className="text-xl font-bold">Event Details</h2>
+                <Button variant="ghost" size="sm" onClick={closeViewModal}>
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+              <div className="p-6 space-y-4">
+                {selectedEvent.image_url && (
+                  <img 
+                    src={selectedEvent.image_url} 
+                    alt={selectedEvent.event_name || 'Event image'}
+                    className="w-full h-48 object-cover rounded-lg"
+                  />
+                )}
+                <div>
+                  <h3 className="font-semibold text-lg mb-4">{selectedEvent.event_name || 'Untitled Event'}</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                    {Object.entries(selectedEvent).map(([key, value]) => {
+                      // Skip certain fields or format them specially
+                      if (key === 'image_url' || key === 'event_name') return null;
+                      
+                      const formatValue = (val: any) => {
+                        if (val === null || val === undefined) return 'Not specified';
+                        if (typeof val === 'boolean') return val ? 'Yes' : 'No';
+                        if (key.includes('date') || key.includes('time')) {
+                          try {
+                            const date = new Date(val);
+                            // For date-only fields, show just the date
+                            if (key === 'start_date' || key === 'end_date') {
+                              return date.toLocaleDateString();
+                            }
+                            // For timestamp fields, show full date and time
+                            return date.toLocaleString();
+                          } catch {
+                            return val.toString();
+                          }
+                        }
+                        if (key === 'page_url' && val) {
+                          return (
+                            <a href={val} className="text-blue-600 underline break-all" target="_blank" rel="noopener noreferrer">
+                              {val}
+                            </a>
+                          );
+                        }
+                        if (typeof val === 'string' && val.length > 100) {
+                          return val;
+                        }
+                        return val.toString();
+                      };
+
+                      const formatFieldName = (fieldName: string) => {
+                        return fieldName
+                          .split('_')
+                          .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                          .join(' ');
+                      };
+
+                      const isLongText = typeof value === 'string' && value.length > 100;
+                      const colSpan = isLongText ? 'md:col-span-2' : '';
+
+                      return (
+                        <div key={key} className={colSpan}>
+                          <strong>{formatFieldName(key)}:</strong>
+                          <div className={`mt-1 ${isLongText ? 'whitespace-pre-wrap' : ''}`}>
+                            {formatValue(value)}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Edit Event Modal */}
+        {isEditModalOpen && editingEvent && (
+          <div 
+            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
+            onClick={(e) => {
+              // Close modal when clicking on backdrop
+              if (e.target === e.currentTarget) {
+                closeEditModal();
+              }
+            }}
+            onKeyDown={(e) => {
+              console.log('Edit modal keydown:', e.key, e.code, e.which);
+              if (e.key === 'Escape' || e.code === 'Escape' || e.which === 27) {
+                console.log('Edit modal detected Escape - closing edit modal');
+                e.preventDefault();
+                e.stopPropagation();
+                closeEditModal();
+              }
+            }}
+            tabIndex={-1}
+            role="dialog"
+            aria-modal="true"
+          >
+            <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+              <div className="flex items-center justify-between p-6 border-b">
+                <h2 className="text-xl font-bold">Edit Event</h2>
+                <Button variant="ghost" size="sm" onClick={closeEditModal}>
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+              <form onSubmit={handleUpdateEvent} className="p-6 space-y-4">
+                {updateError && (
+                  <div className="p-3 rounded border border-red-400 bg-red-100 text-red-800 text-sm">
+                    {updateError}
+                  </div>
+                )}
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {Object.entries(editingEvent).map(([key, value]) => {
+                    // Skip non-editable fields
+                    if (key === 'id' || key === 'created_at' || key === 'updated_at') return null;
+                    
+                    const formatFieldName = (fieldName: string) => {
+                      return fieldName
+                        .split('_')
+                        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                        .join(' ');
+                    };
+
+                    const handleFieldChange = (fieldKey: string, newValue: any) => {
+                      setEditingEvent({...editingEvent, [fieldKey]: newValue});
+                    };
+
+                    const getInputType = (fieldKey: string, fieldValue: any) => {
+                      // Handle specific date fields from the schema
+                      if (fieldKey === 'start_date' || fieldKey === 'end_date') return 'date';
+                      if (fieldKey.includes('time') || fieldKey === 'created_at' || fieldKey === 'updated_at') return 'datetime-local';
+                      if (fieldKey.includes('url') || fieldKey.includes('link')) return 'url';
+                      if (fieldKey.includes('email')) return 'email';
+                      if (fieldKey.includes('phone')) return 'tel';
+                      if (typeof fieldValue === 'number') return 'number';
+                      if (typeof fieldValue === 'boolean') return 'checkbox';
+                      return 'text';
+                    };
+
+                    const isLongText = typeof value === 'string' && (
+                      key.includes('description') || 
+                      key.includes('content') || 
+                      key.includes('details') ||
+                      (typeof value === 'string' && value.length > 100)
+                    );
+
+                    const colSpan = isLongText ? 'md:col-span-2' : '';
+                    const inputType = getInputType(key, value);
+                    const isRequired = key === 'event_name';
+
+                    if (inputType === 'checkbox') {
+                      return (
+                        <div key={key} className={colSpan}>
+                          <label className="flex items-center space-x-2">
+                            <input
+                              type="checkbox"
+                              checked={!!value}
+                              onChange={e => handleFieldChange(key, e.target.checked)}
+                              className="rounded border-gray-300"
+                            />
+                            <span className="text-sm font-medium">{formatFieldName(key)}</span>
+                          </label>
+                        </div>
+                      );
+                    }
+
+                    if (isLongText) {
+                      return (
+                        <div key={key} className={colSpan}>
+                          <label htmlFor={key} className="block text-sm font-medium mb-1">
+                            {formatFieldName(key)}
+                            {isRequired && <span className="text-red-500 ml-1">*</span>}
+                          </label>
+                          <textarea
+                            id={key}
+                            rows={4}
+                            required={isRequired}
+                            value={(value as string) || ''}
+                            onChange={e => handleFieldChange(key, e.target.value)}
+                            className="w-full px-3 py-2 border rounded-md bg-background text-foreground"
+                          />
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div key={key} className={colSpan}>
+                        <label htmlFor={key} className="block text-sm font-medium mb-1">
+                          {formatFieldName(key)}
+                          {isRequired && <span className="text-red-500 ml-1">*</span>}
+                        </label>
+                        <input
+                          id={key}
+                          type={inputType}
+                          required={isRequired}
+                          value={
+                            inputType === 'datetime-local' && value
+                              ? (() => {
+                                  try {
+                                    return new Date(value as string).toISOString().slice(0, 16);
+                                  } catch {
+                                    return '';
+                                  }
+                                })()
+                              : inputType === 'date' && value
+                              ? (() => {
+                                  try {
+                                    // For date fields, just use the date part
+                                    const date = new Date(value as string);
+                                    return date.toISOString().slice(0, 10);
+                                  } catch {
+                                    return '';
+                                  }
+                                })()
+                              : (value as string) || ''
+                          }
+                          onChange={e => {
+                            let newValue: any = e.target.value;
+                            if (inputType === 'datetime-local' && newValue) {
+                              newValue = new Date(newValue).toISOString();
+                            } else if (inputType === 'date' && newValue) {
+                              // For date fields, keep as date string (YYYY-MM-DD)
+                              newValue = newValue;
+                            } else if (inputType === 'number') {
+                              newValue = parseFloat(newValue) || 0;
+                            }
+                            handleFieldChange(key, newValue);
+                          }}
+                          className="w-full px-3 py-2 border rounded-md bg-background text-foreground"
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="flex gap-2 pt-4">
+                  <Button type="button" variant="outline" onClick={closeEditModal}>
+                    Cancel
+                  </Button>
+                  <Button type="submit" disabled={updateLoading}>
+                    {updateLoading ? (
+                      <>
+                        <Clock className="w-4 h-4 mr-2 animate-spin" />
+                        Updating...
+                      </>
+                    ) : (
+                      'Update Event'
+                    )}
+                  </Button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
