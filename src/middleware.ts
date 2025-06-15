@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { createServerClient, type CookieOptions } from '@supabase/ssr';
-import { getCurrentSession } from './lib/auth';
+import { createServerClient } from '@supabase/ssr';
 
 export async function middleware(req: NextRequest) {  
   // Create a response object that we'll modify
@@ -42,7 +41,7 @@ export async function middleware(req: NextRequest) {
   
   try {
     // Check the session
-    const { data: { session }, error } = await supabase.auth.getSession(); // Get the session
+    const { data: { session } } = await supabase.auth.getSession(); // Get the session
     
     if (session) { // If the session is valid
       const {data: {user}} = await supabase.auth.getUser(); // Get the user

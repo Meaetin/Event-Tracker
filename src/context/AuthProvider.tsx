@@ -94,11 +94,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     initializeAuth(); // Initialize the auth
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(handleAuthChange); // Subscribe to the auth state change
+    supabase.auth.onAuthStateChange(handleAuthChange); // Subscribe to the auth state change
 
     return () => {
       mounted.current = false; // Set the mounted flag to false
-      // subscription?.unsubscribe(); // Unsubscribe from the auth state change
+      // Unsubscribe from the auth state change if needed
     };
   }, [refreshAuth, handleAuthChange]); // When the auth state changes, this function is called
 

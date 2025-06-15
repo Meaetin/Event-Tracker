@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import FirecrawlApp from '@mendable/firecrawl-js';
 import { createClient } from '@supabase/supabase-js';
 
@@ -69,12 +69,12 @@ async function processWithAI(scrapedData: { markdown: string; url: string }) {
       try {
         const errorData = await response.json();
         errorMessage = errorData.error || errorMessage;
-      } catch (parseError) {
+      } catch {
         // If we can't parse the error response as JSON, get the text
         try {
           const errorText = await response.text();
           errorMessage = `HTTP ${response.status}: ${errorText.substring(0, 200)}...`;
-        } catch (textError) {
+        } catch {
           errorMessage = `HTTP ${response.status}: ${response.statusText}`;
         }
       }
@@ -103,7 +103,7 @@ async function processWithAI(scrapedData: { markdown: string; url: string }) {
   }
 }
 
-export async function POST(req: NextRequest) {
+export async function POST() {
   console.log('🚀 Starting queue processing...');
   
   try {
@@ -177,7 +177,7 @@ export async function POST(req: NextRequest) {
         console.log(`💾 Step 3: Inserting events and updating database for item ${item.id}...`);
         
         let insertedEventsCount = 0;
-        let insertErrors = [];
+        const insertErrors = [];
 
         // Insert AI processed events into events table if successful
         if (aiProcessedData.success && aiProcessedData.events && aiProcessedData.events.length > 0) {

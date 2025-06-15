@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, ZoomControl } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import 'react-leaflet-markercluster/styles';
 import MarkerClusterGroup from 'react-leaflet-markercluster';
@@ -213,9 +213,8 @@ const EventsMap = forwardRef<EventsMapRef, EventsMapProps>(({
         if (mapRef.current) {
           const map = mapRef.current;
           
-          // Get map bounds and center
+          // Get map bounds and zoom
           const bounds = map.getBounds();
-          const center = map.getCenter();
           const zoom = map.getZoom();
           
           // Calculate if we need to adjust the view

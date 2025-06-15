@@ -15,7 +15,7 @@ export default function UserDashboard() {
           <div>
             <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
             <p className="text-muted-foreground">
-              Welcome back! Here's what's happening with your events.
+              Welcome back! Here&apos;s what&apos;s happening with your events.
             </p>
           </div>
           <Button asChild>
@@ -88,7 +88,7 @@ export default function UserDashboard() {
             <CardHeader>
               <CardTitle>Upcoming Events</CardTitle>
               <CardDescription>
-                Events you've saved or registered for
+                Events you&apos;ve saved or registered for
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
