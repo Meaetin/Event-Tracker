@@ -25,14 +25,24 @@ export default function AdminDashboard() {
   const [pendingListings, setPendingListings] = useState<
     { id: string; title: string; url: string; image_url: string; status: string; created_at: string }[]
   >([]);
-  const [approvedCount, setApprovedCount] = useState(0);
   const [processingQueue, setProcessingQueue] = useState<
+    { id: string; title: string; url: string; image_url: string; status: string; created_at: string; queued_for_processing: boolean; updated_at: string; processing_started_at: string | null }[]
+  >([]);
+  const [processedEvents, setProcessedEvents] = useState<
+    { id: string; event_name: string; page_url: string; image_url: string; updated_at: string; start_date: string; location_text: string; description: string }[]
+  >([]);
+  const [errorItems, setErrorItems] = useState<
     { id: string; title: string; url: string; image_url: string; status: string; created_at: string; queued_for_processing: boolean; updated_at: string }[]
   >([]);
   const [loadingListings, setLoadingListings] = useState(true);
   const [processingItems, setProcessingItems] = useState<Set<string>>(new Set());
   const [queueProcessing, setQueueProcessing] = useState(false);
   const [autoRefresh, setAutoRefresh] = useState(false);
+
+  // Direct URL addition state
+  const [directUrl, setDirectUrl] = useState("");
+  const [directUrlLoading, setDirectUrlLoading] = useState(false);
+  const [directUrlError, setDirectUrlError] = useState<string | null>(null);
 
   // Fetch pending listings and approved count
   async function fetchListings() {
@@ -47,26 +57,95 @@ export default function AdminDashboard() {
       if (pendingError) throw pendingError;
       setPendingListings(pending || []);
 
-      // Fetch approved, processed, and error items (for processing queue view)
-      const { data: approved, error: approvedError } = await supabase
-        .from('scraped_listings')
-        .select('id, title, url, image_url, status, created_at, queued_for_processing, updated_at')
-        .in('status', ['approved', 'processed', 'error'])
-        .order('created_at', { ascending: false });
-      
-      if (approvedError) throw approvedError;
-      setProcessingQueue(approved || []);
+      // Fetch items in processing queue (approved items and error items queued for retry)
+      try {
+        // Try to fetch with processing_started_at field first
+        let queueItems, queueError;
+        try {
+          const result = await supabase
+            .from('scraped_listings')
+            .select('id, title, url, image_url, status, created_at, queued_for_processing, updated_at, processing_started_at')
+            .in('status', ['approved', 'error'])
+            .eq('queued_for_processing', true)
+            .order('updated_at', { ascending: false });
+          
+          queueItems = result.data;
+          queueError = result.error;
+        } catch (fieldError) {
+          // If processing_started_at field doesn't exist, fetch without it
+          console.log('processing_started_at field not found, fetching without it');
+          const result = await supabase
+            .from('scraped_listings')
+            .select('id, title, url, image_url, status, created_at, queued_for_processing, updated_at')
+            .in('status', ['approved', 'error'])
+            .eq('queued_for_processing', true)
+            .order('updated_at', { ascending: false });
+          
+          queueItems = result.data;
+          queueError = result.error;
+        }
+        
+        if (queueError) {
+          console.error('Error fetching queue items:', queueError);
+          setProcessingQueue([]);
+        } else {
+          // Add processing_started_at as null for backward compatibility if it doesn't exist
+          const queueItemsWithProcessing = (queueItems || []).map((item: any) => ({
+            ...item,
+            processing_started_at: item.processing_started_at || null
+          }));
+          setProcessingQueue(queueItemsWithProcessing);
+        }
+      } catch (queueException) {
+        console.error('Exception fetching queue items:', queueException);
+        setProcessingQueue([]);
+      }
 
-      // Fetch approved count
-      const { count, error: countError } = await supabase
-        .from('scraped_listings')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'approved');
-      
-      if (countError) throw countError;
-      setApprovedCount(count || 0);
+      // Also fetch error items that are not queued for retry (for the error section)
+      try {
+        const { data: errorItems, error: errorItemsError } = await supabase
+          .from('scraped_listings')
+          .select('id, title, url, image_url, status, created_at, queued_for_processing, updated_at')
+          .eq('status', 'error')
+          .eq('queued_for_processing', false)
+          .order('updated_at', { ascending: false });
+        
+        if (errorItemsError) {
+          console.error('Error fetching error items:', errorItemsError);
+          setErrorItems([]);
+        } else {
+          setErrorItems(errorItems || []);
+        }
+      } catch (errorItemsException) {
+        console.error('Exception fetching error items:', errorItemsException);
+        setErrorItems([]);
+      }
+
+      // Fetch processed events from events table (sorted by recently updated)
+      try {
+        const { data: events, error: eventsError } = await supabase
+          .from('events')
+          .select('id, event_name, page_url, image_url, updated_at, start_date, location_text, description')
+          .order('updated_at', { ascending: false });
+        
+        if (eventsError) {
+          console.error('Error fetching events:', eventsError);
+          // If events table doesn't exist, that's okay - just set empty array
+          if (eventsError.code === 'PGRST106' || eventsError.message?.includes('does not exist')) {
+            console.log('Events table does not exist yet - this is normal for new installations');
+          }
+          setProcessedEvents([]);
+        } else {
+          setProcessedEvents(events || []);
+        }
+      } catch (eventsException) {
+        console.error('Exception fetching events:', eventsException);
+        setProcessedEvents([]);
+      }
+
     } catch (error) {
       console.error('Error fetching listings:', error);
+      console.error('Error details:', JSON.stringify(error, null, 2));
     } finally {
       setLoadingListings(false);
     }
@@ -264,6 +343,32 @@ export default function AdminDashboard() {
     }
   }
 
+  // Handle direct URL addition to processing queue
+  async function handleDirectUrlSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setDirectUrlError(null);
+    setDirectUrlLoading(true);
+    try {
+      const res = await fetch("/api/add-to-queue", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: directUrl }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to add URL to queue");
+      
+      // Refresh listings after successful addition
+      await fetchListings();
+      
+      // Clear the URL input after successful addition
+      setDirectUrl("");
+    } catch (err: any) {
+      setDirectUrlError(err.message || "Unknown error");
+    } finally {
+      setDirectUrlLoading(false);
+    }
+  }
+
   return (
     <div className="min-h-screen bg-background p-4 md:p-6 lg:p-8">
       <div className="max-w-7xl mx-auto space-y-6">
@@ -324,13 +429,13 @@ export default function AdminDashboard() {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Approved Listings</CardTitle>
+              <CardTitle className="text-sm font-medium">Processed Events</CardTitle>
               <CheckCircle className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{approvedCount}</div>
+              <div className="text-2xl font-bold">{processedEvents.length}</div>
               <p className="text-xs text-muted-foreground">
-                Total approved items
+                AI processed and ready
               </p>
             </CardContent>
           </Card>
@@ -343,13 +448,15 @@ export default function AdminDashboard() {
               <Search className="w-4 h-4" />
               Scrape Events
             </TabsTrigger>
-            <TabsTrigger value="review" className="flex items-center gap-2">
+            
+            <TabsTrigger value="process" className="flex items-center gap-2">
               <Clock className="w-4 h-4" />
-              Review Events
+              Process
             </TabsTrigger>
-            <TabsTrigger value="approved" className="flex items-center gap-2">
+
+            <TabsTrigger value="events" className="flex items-center gap-2">
               <CheckCircle className="w-4 h-4" />
-              Approved Events
+              Events
             </TabsTrigger>
           </TabsList>
 
@@ -557,14 +664,58 @@ export default function AdminDashboard() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="approved" className="space-y-4">
+          <TabsContent value="process" className="space-y-4">
+            {/* Direct URL Addition Form */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Add URL Directly to Processing Queue</CardTitle>
+                <CardDescription>Add a URL directly to be processed with FireCrawl and AI without scraping first.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {/* Error box above input */}
+                {directUrlError && (
+                  <div className="mb-4 p-3 rounded border border-red-400 bg-red-100 text-red-800 text-sm font-medium">
+                    {directUrlError}
+                  </div>
+                )}
+                <form onSubmit={handleDirectUrlSubmit} className="flex flex-col gap-4 md:flex-row md:items-end">
+                  <div className="flex-1">
+                    <label htmlFor="direct-url" className="block text-sm font-medium mb-1">Event URL</label>
+                    <input
+                      id="direct-url"
+                      type="url"
+                      required
+                      value={directUrl}
+                      onChange={e => setDirectUrl(e.target.value)}
+                      placeholder="https://example.com/event-page"
+                      className="w-full px-3 py-2 border rounded-md bg-background text-foreground"
+                    />
+                  </div>
+                  <Button type="submit" className="mt-2 md:mt-0" disabled={directUrlLoading}>
+                    {directUrlLoading ? (
+                      <>
+                        <Clock className="w-4 h-4 mr-2 animate-spin" />
+                        Adding...
+                      </>
+                    ) : (
+                      <>
+                        <Database className="w-4 h-4 mr-2" />
+                        Add to Queue
+                      </>
+                    )}
+                  </Button>
+                </form>
+              </CardContent>
+            </Card>
+
+            {/* Processing Queue */}
             <Card>
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <div>
-                    <CardTitle>Processing Queue & Approved Events</CardTitle>
+                    <CardTitle>Processing Queue</CardTitle>
                     <CardDescription>
-                      Track FireCrawl scraping and AI processing status of approved events
+                      Items waiting to be processed with FireCrawl and AI
                       {autoRefresh && (
                         <span className="ml-2 inline-flex items-center text-xs text-blue-600">
                           <Clock className="w-3 h-3 mr-1 animate-spin" />
@@ -594,70 +745,177 @@ export default function AdminDashboard() {
               </CardHeader>
               <CardContent>
                 {loadingListings ? (
-                  <div className="text-center py-8">Loading approved items...</div>
+                  <div className="text-center py-8">Loading queue items...</div>
                 ) : processingQueue.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground">
-                    No approved items found. Approve some pending listings to see them here!
+                    No items in processing queue. Add URLs above or approve pending listings!
                   </div>
                 ) : (
                   <div className="space-y-4">
                     {processingQueue.map(item => {
                       const getStatusBadge = () => {
-                        if (item.queued_for_processing) {
+                        if (item.processing_started_at) {
+                          return <Badge variant="outline" className="bg-blue-100 text-blue-800">
+                            <Clock className="w-3 h-3 mr-1 animate-spin" />
+                            Processing...
+                          </Badge>;
+                        } else if (item.status === 'approved' && item.queued_for_processing) {
                           return <Badge variant="outline" className="bg-yellow-100 text-yellow-800">Queued for Processing</Badge>;
-                        } else if (item.status === 'processed') {
-                          return <Badge className="bg-green-100 text-green-800">AI Processed</Badge>;
-                        } else if (item.status === 'error') {
-                          return <Badge variant="destructive">Processing Error</Badge>;
+                        } else if (item.status === 'error' && item.queued_for_processing) {
+                          return <Badge variant="outline" className="bg-orange-100 text-orange-800">Queued for Retry</Badge>;
                         }
-                        return <Badge>Approved</Badge>;
+                        return <Badge variant="outline">In Queue</Badge>;
+                      };
+
+                      const getTimestamp = () => {
+                        if (item.processing_started_at) {
+                          return `Processing started: ${new Date(item.processing_started_at).toLocaleString()}`;
+                        }
+                        return `Added to queue: ${new Date(item.updated_at).toLocaleString()}`;
                       };
 
                       return (
                         <div key={item.id} className="flex items-center justify-between p-4 border border-border rounded-lg">
                           <div className="flex items-center space-x-4">
                             <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
-                              <Calendar className="w-6 h-6 text-primary" />
+                              {item.processing_started_at ? (
+                                <Clock className="w-6 h-6 text-primary animate-spin" />
+                              ) : (
+                                <Calendar className="w-6 h-6 text-primary" />
+                              )}
                             </div>
                             <div>
                               <p className="font-medium text-foreground">{item.title}</p>
                               <p className="text-sm text-muted-foreground">
                                 {item.url}
                               </p>
-                              {(item.status === 'processed' || item.status === 'error') && (
-                                <p className="text-xs text-muted-foreground">
-                                  {item.status === 'processed' ? 'Processed' : 'Error'}: {new Date(item.updated_at).toLocaleString()}
-                                </p>
-                              )}
+                              <p className="text-xs text-muted-foreground">
+                                {getTimestamp()}
+                              </p>
                             </div>
                           </div>
                           <div className="flex items-center space-x-2">
                             {getStatusBadge()}
-                            {item.status === 'processed' && (
-                              <Button size="sm" variant="outline">View Details</Button>
-                            )}
-                            {item.status === 'error' && !item.queued_for_processing && (
-                              <Button 
-                                size="sm" 
-                                variant="outline"
-                                onClick={() => handleRetryProcessing(item.id)}
-                                disabled={processingItems.has(item.id)}
-                                className="text-orange-600 border-orange-600 hover:bg-orange-50"
-                              >
-                                {processingItems.has(item.id) ? (
-                                  <>
-                                    <Clock className="w-3 h-3 mr-1 animate-spin" />
-                                    Retrying...
-                                  </>
-                                ) : (
-                                  'Retry Processing'
-                                )}
-                              </Button>
-                            )}
                           </div>
                         </div>
                       );
                     })}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Error Items */}
+            {errorItems.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Failed Processing Items ({errorItems.length})</CardTitle>
+                  <CardDescription>
+                    Items that failed processing and need to be retried
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {errorItems.map(item => (
+                      <div key={item.id} className="flex items-center justify-between p-4 border border-red-200 rounded-lg bg-red-50">
+                        <div className="flex items-center space-x-4">
+                          <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
+                            <AlertCircle className="w-6 h-6 text-red-600" />
+                          </div>
+                          <div>
+                            <p className="font-medium text-foreground">{item.title}</p>
+                            <p className="text-sm text-muted-foreground">
+                              {item.url}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              Failed: {new Date(item.updated_at).toLocaleString()}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Badge variant="destructive">Processing Error</Badge>
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            onClick={() => handleRetryProcessing(item.id)}
+                            disabled={processingItems.has(item.id)}
+                            className="text-orange-600 border-orange-600 hover:bg-orange-50"
+                          >
+                            {processingItems.has(item.id) ? (
+                              <>
+                                <Clock className="w-3 h-3 mr-1 animate-spin" />
+                                Retrying...
+                              </>
+                            ) : (
+                              'Retry Processing'
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+          </TabsContent>
+
+          <TabsContent value="events" className="space-y-4">
+            {/* Processed Events */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Processed Events ({processedEvents.length})</CardTitle>
+                <CardDescription>
+                  Events that have been successfully processed with AI and added to the events database
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {loadingListings ? (
+                  <div className="text-center py-8">Loading processed events...</div>
+                ) : processedEvents.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    No processed events found. Process some URLs to see them here!
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {processedEvents.map(event => (
+                      <div key={event.id} className="rounded-xl border p-4 flex gap-6 bg-white shadow-sm">
+                        <div className="flex-shrink-0">
+                          {event.image_url ? (
+                            <img src={event.image_url} alt={event.event_name} className="w-60 h-32 object-cover rounded-lg" />
+                          ) : (
+                            <div className="w-40 h-28 bg-gray-200 rounded-lg flex items-center justify-center text-gray-400">No Image</div>
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start gap-2 mb-1">
+                            <div className="flex-1">
+                              <h3 className="font-bold text-xl leading-tight mb-1" title={event.event_name}>{event.event_name}</h3>
+                              <Badge className="bg-green-100 text-green-800 mb-2">AI Processed</Badge>
+                              <div className="text-sm mb-1">
+                                <strong>Date:</strong> {event.start_date ? new Date(event.start_date).toLocaleDateString() : 'Not specified'}
+                              </div>
+                              <div className="text-sm mb-1">
+                                <strong>Location:</strong> {event.location_text || 'Not specified'}
+                              </div>
+                              <div className="text-sm mb-2">
+                                <strong>Description:</strong> {event.description ? event.description.substring(0, 150) + '...' : 'Not available'}
+                              </div>
+                            </div>
+                            <div className="flex gap-2 ml-4">
+                              <Button size="sm" variant="outline">View Full Details</Button>
+                              <Button size="sm" variant="outline">Edit Event</Button>
+                            </div>
+                          </div>
+                          <div className="text-sm mb-1">
+                            Source: <a href={event.page_url} className="text-blue-600 underline break-all" target="_blank" rel="noopener noreferrer">{event.page_url}</a>
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            Processed: {event.updated_at ? new Date(event.updated_at).toLocaleString() : '-'}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 )}
               </CardContent>

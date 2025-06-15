@@ -43,6 +43,7 @@ event_id (unique, string)
 event_name (string)
 start_date (YYYY-MM-DD)
 end_date (YYYY-MM-DD)
+date_text (string, display-friendly version of the event's date or "Permanent; opened [date]" if it is a permanent attraction/venue)
 location_text (full address of all locations/venues, string)
 description (event overview, string)
 price_min (number, lowest possible price per person)
@@ -57,6 +58,7 @@ detailed_breakdown (markdown or plain text step-by-step/segment time breakdown)
 primary_lat (number, latitude for primary location/pin)
 primary_lng (number, longitude for primary location/pin)
 categories (array of 2-3 most relevant category IDs for the event from this list below, e.g. [8,9,12])
+image_url (string, URL of the cover image; select the hero/preview or og:image for the venue/event)
 
 Here are the available categories and their IDs:
 
@@ -92,6 +94,29 @@ LOCATION EXTRACTION GUIDELINES:
 - Look for patterns like "Multiple venues including...", "Various locations...", "Different venues such as...", etc.
 - Extract ONLY the first venue name mentioned after these phrases
 
+PERMANENT VENUE IDENTIFICATION (REQUIRED):
+- If the content describes a permanent or ongoing venue, store, installation, or experience (not a one-off or periodic event):
+  * Set the end_date to a far-future date (e.g., "2035-12-31")
+  * Set start_date to the official opening date, or the earliest mentioned date.
+  * Set date_text to "Permanent; opened [opening date]" (e.g., "Permanent; opened 14 Jun 2025").
+  * Clearly indicate in the description that this is a permanent (always open) attraction, NOT a seasonal/pop-up event.
+- If not a permanent attraction, set date_text to the normal event date range (e.g., "14-16 June 2025").
+
+DISPLAY DATE FORMATTING:
+- Always fill in date_text with a user-friendly string:
+   * For single-day events: "14 June 2025"
+   * For multi-day/date-range events: "14-16 June 2025"
+   * For permanent venues: "Permanent; opened 14 Jun 2025"
+   * If fallback publication date is used, format as "23 May 2025" (day month year)
+
+PRICE FIELDS STANDARDISATION:
+- If the main admission is free, set price_min and price_max to 0. Display-friendly price: "Free".
+- If prices are unavailable, set price_min and price_max to null and display-friendly price to "See details" or similar.
+
+CATEGORY SELECTION:
+- Select 2-3 of the most relevant categories for each event/venue, matching the category ID precisely.
+- If the event/venue is a hybrid (e.g., permanent gaming store + food & drinks area), choose all fitting categories.
+
 CRITICAL: AREA TO LANDMARK CONVERSION (MANDATORY):
 - ALWAYS convert vague area names to specific landmarks - this is REQUIRED for accurate mapping
 - NEVER use general area names like "Marina Bay" - ALWAYS convert to specific landmarks
@@ -111,7 +136,6 @@ CRITICAL: AREA TO LANDMARK CONVERSION (MANDATORY):
 - If you see any of these area names, you MUST replace them with the corresponding landmark
 - Use well-known landmarks like shopping malls, MRT stations, or major buildings within the area
 - This conversion is MANDATORY for precise geocoding - do NOT skip this step
-
 - Include the full address if available, including the venue name
 - Singapore postal codes are 6 digits (like, Singapore 02315)
 - If a Singapore postal code is present, ALWAYS include it in the location string
@@ -119,25 +143,13 @@ CRITICAL: AREA TO LANDMARK CONVERSION (MANDATORY):
 - If only venue name is available, format as: "Venue Name, Singapore"
 - The postal code is crucial for accurate coordinate mapping
 
-FALLBACK DATE EXTRACTION:
-- If no specific event start date is found in the content, look for the article publication date
-- The publication date usually appears in this format in the markdown:
-  [Author Name](link)
-  •
-  [Date] (e.g., "23 May 2025")
-  •
-  [Category]
-  •
-  [Reading time]
-- The publication date is typically located below the author name and above the category/reading time
-- Use this publication date as the event date if no other specific event date is mentioned
-- Format the fallback date in the same way (e.g., "23 May 2025")
 
 Other guidelines:
 - All dates should be processed based on Singapore timezone (SGT/UTC+8)
-- If the date is relative (like "this weekend", "next Friday"), try to infer the actual date based on current Singapore time
-
-Output an array of events. All field names must match the above exactly.
+- If the date is relative (like "this weekend", "next Friday"), try to infer the actual date based on current Singapore timev
+- For visit_notes and detailed_breakdown, always use markdown-style bullet lists and clear segment headings for clarity.
+- All dates and times must be represented and interpreted in Singapore timezone (SGT/UTC+8). Conversion is required if UTC or other zone.
+- Output fields must exactly match the specified order. No extra fields, no missing fields.
 
 Your output should be valid JSON, ready for import, with markdown text in the relevant fields.
 
@@ -149,6 +161,7 @@ events: [
     "event_name": "Islander's Day at West Coast Park",
     "start_date": "2025-06-14",
     "end_date": "2025-06-14",
+    "date_text": "Permanent; opened 14 Jun 2025",
     "location_text": "West Coast Ferry Road, Main Lawn, Singapore 126978",
     "description": "Celebrate the heritage of Singapore's original islanders, the Orang Pulau, at Islander's Day, held at West Coast Park. Experience maritime workshops, interactive storytelling for kids, traditional performances, and free film screenings— all designed to showcase the islander way of life. Organised by Orang Laut SG, this community event offers a rare chance to learn about island skills, crafts, and folklore, right on Singapore's mainland.",
     "price_min": 0,
@@ -167,6 +180,7 @@ events: [
     "visit_notes": "Most visitors spend 2-3 hours, enjoying open performances, film screenings, and free activities. For those joining hands-on workshops (maritime skills or Jong boat-making), budget 1.5-2 hrs per workshop and book ahead due to limited slots and paid entry. The event is mostly outdoors—bring a hat, sunscreen, and water. Some seating is available for performances and films. Easily accessible via Clementi MRT and bus 201 (alight at Opp Waseda S Snr High Sch, short walk to main lawn).",
     "detailed_breakdown": "• Explore displays, food stalls, and photo ops: 20-30 min\n• Maritime Fishing Workshop: 1.5-2 hr (pre-book, $16.82)\n• Jong Boat Workshop: 1.5-2 hr (pre-book, $16.82)\n• Storytelling for Kids: 45 min (ages 5+, $17.87, ticketed)\n• Watch a Film/Performance: 30-60 min each (varies through the day, all free)\n• Mingling/relaxing breaks: 20-30 min\n_\nTypical visit: 2-3 hours. Full festival experience (with workshops): 4-5 hours.",
     "categories": [1, 7, 8],
+    "image_url": "https://thesmartlocal.com/wp-content/uploads/2025/06/Gamers-Guild-Bugis-cover-image-.png",
     }
 ]
 
@@ -181,7 +195,7 @@ ${markdown}`;
 
     // Call OpenAI API
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4o',
+      model: 'gpt-4o-mini',
       messages: [
         {
           role: 'user',

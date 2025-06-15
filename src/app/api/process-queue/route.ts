@@ -116,11 +116,13 @@ export async function POST(req: NextRequest) {
     console.log('📊 Fetching queued items...');
     
     // Get items queued for processing (approved items or error items that are queued for retry)
+    // Exclude items that are already being processed (have processing_started_at set)
     const { data: queuedItems, error: fetchError } = await supabase
       .from('scraped_listings')
       .select('*')
       .in('status', ['approved', 'error'])
       .eq('queued_for_processing', true)
+      .is('processing_started_at', null)
       .order('created_at', { ascending: true })
       .limit(10); // Process max 10 at a time
 
@@ -143,12 +145,12 @@ export async function POST(req: NextRequest) {
       try {
         console.log(`🔍 Processing item: ${item.title} (${item.url})`);
         
-        // Mark as currently processing (just set the queue flag to false to prevent duplicate processing)
+        // Mark as currently processing (set processing_started_at but keep queued_for_processing true)
         console.log(`📝 Marking item ${item.id} as processing...`);
         const { error: markError } = await supabase
           .from('scraped_listings')
           .update({ 
-            queued_for_processing: false,
+            processing_started_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
           })
           .eq('id', item.id);
@@ -186,7 +188,6 @@ export async function POST(req: NextRequest) {
               // Add source reference to the event
               const eventWithSource = {
                 ...event,
-                image_url: item.image_url,
                 page_url: item.url,
                 created_at: new Date().toISOString(),
                 updated_at: new Date().toISOString()
@@ -222,6 +223,7 @@ export async function POST(req: NextRequest) {
           .update({
             status: newStatus,
             queued_for_processing: false,
+            processing_started_at: null, // Clear processing timestamp
             updated_at: new Date().toISOString()
           })
           .eq('id', item.id);
@@ -250,6 +252,7 @@ export async function POST(req: NextRequest) {
             .update({
               status: 'error',
               queued_for_processing: false,
+              processing_started_at: null, // Clear processing timestamp
               updated_at: new Date().toISOString()
             })
             .eq('id', item.id);
