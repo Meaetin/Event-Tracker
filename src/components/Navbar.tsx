@@ -7,7 +7,7 @@ import { useAuth } from '../context/AuthProvider';
 import { getUserRole } from '../lib/auth';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetTrigger, SheetTitle } from '@/components/ui/sheet';
 import { Menu, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -41,14 +41,14 @@ export default function Navbar() {
   // Navigation items
   const navigationItems = [
     { href: '/', label: 'Home' },
-    { href: '/events', label: 'Events Map' },
+    { href: '/map', label: 'Events Map' },
   ];
 
   const NavLink = ({ href, children, mobile = false }: { href: string; children: React.ReactNode; mobile?: boolean }) => (
     <Link 
       href={href}
       className={cn(
-        mobile ? "block px-3 py-2 text-base font-medium" : "px-3 py-2 text-sm font-medium",
+        mobile ? "block px-3 py-2 text-sm font-medium" : "px-3 py-2 text-sm font-medium",
         "rounded-md transition-colors",
         isActive(href) 
           ? "text-primary bg-primary/10" 
@@ -63,11 +63,11 @@ export default function Navbar() {
   return (
     <nav className="bg-background border-b border-border shadow-sm">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between h-16">
+        <div className="flex justify-between h-12">
           {/* Logo */}
           <div className="flex items-center">
             <div className="flex-shrink-0">
-              <Link href="/" className="text-xl font-bold text-primary">
+              <Link href="/" className="text-lg font-bold text-primary">
                 EventScapeSG
               </Link>
             </div>
@@ -132,11 +132,11 @@ export default function Navbar() {
                   <span className="sr-only">Open main menu</span>
                 </Button>
               </SheetTrigger>
-              <SheetContent side="right" className="w-[300px] sm:w-[400px]">
-                <div className="flex flex-col space-y-4 mt-6">
-                  <div className="text-lg font-semibold text-primary mb-4">
-                    EventScapeSG
-                  </div>
+              <SheetContent side="right" className="w-[280px] max-w-[75vw]">
+                <SheetTitle className="text-base font-semibold text-primary mb-3">
+                  EventScapeSG
+                </SheetTitle>
+                <div className="flex flex-col space-y-3 mt-4">
                   
                   {navigationItems.map((item) => (
                     <NavLink key={item.href} href={item.href} mobile>
@@ -145,7 +145,7 @@ export default function Navbar() {
                   ))}
                   
                   {/* AI Event Planning - Coming Soon (Mobile) */}
-                  <div className="px-3 py-2 rounded-md text-base font-medium text-muted-foreground">
+                  <div className="px-3 py-2 rounded-md text-sm font-medium text-muted-foreground">
                     AI Event Planning
                     <Badge variant="secondary" className="ml-2 text-xs">
                       Coming Soon
@@ -159,7 +159,7 @@ export default function Navbar() {
                   )}
 
                   {/* Mobile auth section */}
-                  <div className="border-t border-border pt-4 mt-4">
+                  <div className="border-t border-border pt-3 mt-3">
                     {mounted && authUser ? (
                       <Button
                         variant="ghost"
@@ -171,21 +171,21 @@ export default function Navbar() {
                       >
                         Sign Out
                       </Button>
-                    ) : mounted && (
-                      <div className="space-y-2">
-                        <NavLink href="/login" mobile>
-                          Login
-                        </NavLink>
-                        <Button asChild className="w-full">
-                          <Link 
-                            href="/signup"
-                            onClick={() => setIsMobileMenuOpen(false)}
-                          >
-                            Sign Up
-                          </Link>
-                        </Button>
-                      </div>
-                    )}
+                                          ) : mounted && (
+                        <div className="space-y-2">
+                          <NavLink href="/login" mobile>
+                            Login
+                          </NavLink>
+                          <Button asChild className="w-full" size="sm">
+                            <Link 
+                              href="/signup"
+                              onClick={() => setIsMobileMenuOpen(false)}
+                            >
+                              Sign Up
+                            </Link>
+                          </Button>
+                        </div>
+                      )}
                   </div>
                 </div>
               </SheetContent>

@@ -166,10 +166,10 @@ events: [
     "description": "Celebrate the heritage of Singapore's original islanders, the Orang Pulau, at Islander's Day, held at West Coast Park. Experience maritime workshops, interactive storytelling for kids, traditional performances, and free film screenings— all designed to showcase the islander way of life. Organised by Orang Laut SG, this community event offers a rare chance to learn about island skills, crafts, and folklore, right on Singapore's mainland.",
     "price_min": 0,
     "price_max": 17.87,
-    "price": "Free entry, workshops $16.82-$17.87",
+    "price": "Free entry, workshops $16.82 - $17.87",
     "duration_min": 1.5,
     "duration_max": 5,
-    "opening_hours": "10am-9pm",
+    "opening_hours": "10am - 9pm",
     "opening_hours_structured": [
         {
         "day": "Saturday",

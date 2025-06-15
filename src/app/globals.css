@@ -243,3 +243,92 @@ body {
   overflow: hidden;
   word-break: break-word;
 }
+
+/* Bottom Sheet Animation */
+@keyframes slide-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+.animate-slide-up {
+  animation: slide-up 0.3s ease-out;
+}
+
+/* Mobile Popup Styles - Enhanced Centering */
+.event-popup .leaflet-popup-content-wrapper {
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.event-popup .leaflet-popup-tip {
+  background: white;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.event-popup .leaflet-popup-content {
+  margin: 0 !important;
+  padding: 0 !important;
+  width: 100% !important;
+}
+
+@media (max-width: 768px) {
+  .mobile-popup .leaflet-popup-content-wrapper {
+    width: calc(100vw - 40px) !important;
+    max-width: calc(100vw - 40px) !important;
+    min-width: 280px !important;
+    margin: 0 auto;
+    min-height: 400px !important;
+  }
+  
+  .mobile-popup .leaflet-popup-content {
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  
+  .mobile-popup .leaflet-popup {
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+    right: auto !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    max-width: calc(100vw - 40px) !important;
+  }
+  
+  /* Ensure popup stays within viewport bounds */
+  .mobile-popup .leaflet-popup-content-wrapper {
+    position: relative;
+    left: 0 !important;
+    right: 0 !important;
+  }
+}
+
+/* Desktop Popup Centering */
+@media (min-width: 769px) {
+  .event-popup .leaflet-popup-content-wrapper {
+    max-width: 600px;
+    min-width: 580px;
+    width: 600px;
+  }
+  
+  .event-popup .leaflet-popup {
+    margin-left: -300px !important; /* Half of width for centering */
+  }
+  
+  .event-popup .leaflet-popup-content {
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  
+  /* Prevent popup from going off-screen on desktop */
+  .event-popup .leaflet-popup-content-wrapper {
+    position: relative;
+  }
+}
