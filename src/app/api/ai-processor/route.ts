@@ -150,6 +150,7 @@ Other guidelines:
 - For visit_notes and detailed_breakdown, always use markdown-style bullet lists and clear segment headings for clarity.
 - All dates and times must be represented and interpreted in Singapore timezone (SGT/UTC+8). Conversion is required if UTC or other zone.
 - Output fields must exactly match the specified order. No extra fields, no missing fields.
+- When generating price fields, ensure the hypen has a space before and after it.
 
 Your output should be valid JSON, ready for import, with markdown text in the relevant fields.
 

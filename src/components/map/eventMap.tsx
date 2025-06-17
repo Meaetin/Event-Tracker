@@ -8,7 +8,7 @@ import MarkerClusterGroup from 'react-leaflet-markercluster';
 import type { LatLngExpression } from 'leaflet';
 import { Icon } from 'leaflet';
 import * as L from 'leaflet';
-import { Calendar, Clock, MapPin, DollarSign, ExternalLink, Navigation } from 'lucide-react';
+import { Calendar, Clock, MapPin, DollarSign, ExternalLink, Navigation, X, Star } from 'lucide-react';
 import { useTheme } from 'next-themes';
 
 export interface Category {
@@ -106,6 +106,8 @@ const EventsMap = forwardRef<EventsMapRef, EventsMapProps>(({
   const [error, setError] = useState<string | null>(null);
   const [categories, setCategories] = useState<{ [key: number]: string }>({});
   const [currentZoom, setCurrentZoom] = useState<number>(zoom);
+  const [favourites, setFavourites] = useState<Set<string>>(new Set());
+  const [favouriteLoading, setFavouriteLoading] = useState<Set<string>>(new Set());
   const mapRef = useRef<L.Map | null>(null);
   const markersRef = useRef<{ [key: string]: L.Marker }>({});
   const { theme, resolvedTheme } = useTheme();
@@ -143,6 +145,11 @@ const EventsMap = forwardRef<EventsMapRef, EventsMapProps>(({
   // Fetch categories for lookup
   useEffect(() => {
     fetchCategories();
+  }, []);
+
+  // Fetch user's favourites
+  useEffect(() => {
+    fetchUserFavourites();
   }, []);
 
   // Track zoom level changes and handle map invalidation
@@ -212,6 +219,65 @@ const EventsMap = forwardRef<EventsMapRef, EventsMapProps>(({
       }
     } catch (error) {
       console.warn('Failed to fetch categories:', error);
+    }
+  };
+
+  const fetchUserFavourites = async () => {
+    try {
+      const response = await fetch('/api/events/favourites');
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.favourites) {
+          setFavourites(new Set(data.favourites.map((fav: any) => fav.event_id)));
+        }
+      }
+    } catch (error) {
+      console.warn('Failed to fetch user favourites:', error);
+    }
+  };
+
+  const toggleFavourite = async (eventId: string) => {
+    const isFavourited = favourites.has(eventId);
+    
+    // Add to loading state
+    setFavouriteLoading(prev => new Set(prev).add(eventId));
+    
+    try {
+      const response = await fetch('/api/events/favourites', {
+        method: isFavourited ? 'DELETE' : 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ event_id: eventId }),
+      });
+      
+      if (response.ok) {
+        const newFavourites = new Set(favourites);
+        if (isFavourited) {
+          newFavourites.delete(eventId);
+        } else {
+          newFavourites.add(eventId);
+        }
+        setFavourites(newFavourites);
+      } else {
+        console.error('Failed to update favourite status');
+      }
+    } catch (error) {
+      console.error('Error updating favourite:', error);
+    } finally {
+      // Remove from loading state
+      setFavouriteLoading(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(eventId);
+        return newSet;
+      });
+    }
+  };
+
+  const closePopup = (eventId: string) => {
+    const marker = markersRef.current[eventId];
+    if (marker) {
+      marker.closePopup();
     }
   };
 
@@ -544,11 +610,51 @@ const EventsMap = forwardRef<EventsMapRef, EventsMapProps>(({
                 autoPan={true}
                 autoPanPadding={[20, 20]}
                 offset={[0, -10]}
-                closeButton={true}
+                closeButton={false}
                 autoClose={false}
                 keepInView={true}
               >
                 <div className="p-4 max-w-none bg-background">
+                  {/* Header with close and favourite buttons */}
+                  <div className="flex justify-end items-center gap-2 mb-3 -mt-1 -mr-1">
+                    <button
+                      onClick={() => toggleFavourite(event.id)}
+                      disabled={favouriteLoading.has(event.id)}
+                      className={`
+                        inline-flex items-center justify-center w-8 h-8 rounded-lg transition-colors
+                        focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary/50
+                        disabled:opacity-50 disabled:cursor-not-allowed
+                        ${favourites.has(event.id) 
+                          ? 'bg-yellow-100 hover:bg-yellow-200 text-yellow-600 hover:text-yellow-700 dark:bg-yellow-900/30 dark:hover:bg-yellow-900/50 dark:text-yellow-400' 
+                          : 'bg-muted hover:bg-muted/80 text-muted-foreground hover:text-foreground'
+                        }
+                      `}
+                      title={favourites.has(event.id) ? "Remove from favourites" : "Add to favourites"}
+                      aria-label={favourites.has(event.id) ? "Remove from favourites" : "Add to favourites"}
+                    >
+                      {favouriteLoading.has(event.id) ? (
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current"></div>
+                      ) : (
+                        <Star 
+                          className={`w-4 h-4 ${favourites.has(event.id) ? 'fill-current' : ''}`} 
+                        />
+                      )}
+                    </button>
+                    
+                    <button
+                      onClick={() => closePopup(event.id)}
+                      className="
+                        inline-flex items-center justify-center w-8 h-8 rounded-lg transition-colors
+                        bg-muted hover:bg-muted/80 text-muted-foreground hover:text-foreground
+                        focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary/50
+                      "
+                      title="Close"
+                      aria-label="Close popup"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+
                   {/* Desktop Layout */}
                   <div className="hidden md:block space-y-3">
                     {/* First Section: Image + Basic Info (Side by Side) */}
