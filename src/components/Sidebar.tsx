@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { X, Calendar, Clock, MapPin, DollarSign, MapPinned } from 'lucide-react';
 import { MapEvent, EventsApiResponse, Category, CategoriesApiResponse } from '@/components/map/eventMap';
 
 interface EventSidebarProps {
@@ -210,13 +211,13 @@ export default function EventSidebar({
 
   if (loading) {
     return (
-      <div className="w-full h-full bg-white shadow-lg border-r border-gray-200 p-4">
+      <div className="w-full h-full bg-background dark:bg-background shadow-lg border-r border-border p-4">
         <div className="animate-pulse space-y-4">
-          <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-          <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+          <div className="h-4 bg-muted rounded w-3/4"></div>
+          <div className="h-4 bg-muted rounded w-1/2"></div>
           <div className="space-y-3">
             {[...Array(5)].map((_, i) => (
-              <div key={i} className="h-20 bg-gray-200 rounded"></div>
+              <div key={i} className="h-20 bg-muted rounded"></div>
             ))}
           </div>
         </div>
@@ -226,13 +227,13 @@ export default function EventSidebar({
 
   if (error) {
     return (
-      <div className="w-full h-full bg-white shadow-lg border-r border-gray-200 p-4">
-        <div className="text-red-600 text-sm">
+      <div className="w-full h-full bg-background shadow-lg border-r border-border p-4">
+        <div className="text-destructive text-sm">
           <p className="font-medium">Error loading events</p>
           <p>{error}</p>
           <button 
             onClick={fetchData}
-            className="mt-2 text-blue-600 hover:text-blue-800 underline"
+            className="mt-2 text-primary hover:text-primary/80 underline"
           >
             Try again
           </button>
@@ -242,21 +243,19 @@ export default function EventSidebar({
   }
 
   return (
-    <div className="w-full h-full bg-white shadow-lg border-r border-gray-200 overflow-y-auto">
-      {/* Header */}
-      <div className="p-3 sm:p-4 border-b border-gray-200">
+    <div className="w-full h-full bg-background shadow-lg border-r border-border overflow-y-auto">
+              {/* Header */}
+        <div className="p-3 sm:p-4 border-b border-border">
         {/* Mobile Header with Close Button */}
         {isMobile && onClose && (
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-lg font-semibold text-gray-900">Events</h2>
+            <h2 className="text-lg font-semibold text-foreground">Events</h2>
             <button
               onClick={onClose}
-              className="p-1 rounded-md text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-colors"
+              className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
               aria-label="Close sidebar"
             >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
+              <X className="w-6 h-6" />
             </button>
           </div>
         )}
@@ -268,57 +267,57 @@ export default function EventSidebar({
             placeholder="Search events..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full px-3 py-2 border border-input rounded-md text-sm bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
           />
         </div>
 
         {/* Filters */}
         <div className="space-y-3">
           {/* Category Filter */}
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <div className="text-sm font-medium text-gray-700">Categories</div>
-              <button
-                onClick={() => {
-                  setSelectedCategories([]);
-                  if (onCategoryChange) {
-                    onCategoryChange([]);
-                  }
-                }}
-                disabled={selectedCategories.length === 0}
-                className={`text-xs px-2 py-1 rounded transition-colors ${
-                  selectedCategories.length === 0
-                    ? 'text-gray-400 cursor-not-allowed'
-                    : 'text-gray-600 hover:text-gray-800 hover:bg-gray-100'
-                }`}
-                title="Reset category filters"
-              >
-                Reset
-              </button>
-            </div>
-            <div className="max-h-32 sm:max-h-40 overflow-y-auto border border-gray-200 rounded-md p-2 space-y-1">
-              {categories.map(category => (
-                <label key={category.id} className="flex items-center cursor-pointer hover:bg-gray-50 p-1 rounded">
-                  <input
-                    type="checkbox"
-                    checked={selectedCategories.includes(category.id.toString())}
-                    onChange={() => handleCategoryToggle(category.id.toString())}
-                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                  />
-                  <span className="ml-2 text-sm text-gray-700">{category.name}</span>
-                </label>
-              ))}
-            </div>
-            {selectedCategories.length > 0 && (
-              <div className="mt-2 text-xs text-gray-600">
-                {selectedCategories.length} filter{selectedCategories.length !== 1 ? 's' : ''} applied
+                      <div>
+              <div className="flex items-center justify-between mb-2">
+                <div className="text-sm font-medium text-foreground">Categories</div>
+                <button
+                  onClick={() => {
+                    setSelectedCategories([]);
+                    if (onCategoryChange) {
+                      onCategoryChange([]);
+                    }
+                  }}
+                  disabled={selectedCategories.length === 0}
+                  className={`text-xs px-2 py-1 rounded transition-colors ${
+                    selectedCategories.length === 0
+                      ? 'text-muted-foreground cursor-not-allowed'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+                  }`}
+                  title="Reset category filters"
+                >
+                  Reset
+                </button>
               </div>
-            )}
+                          <div className="max-h-32 sm:max-h-40 overflow-y-auto border border-border rounded-md p-2 space-y-1">
+                {categories.map(category => (
+                  <label key={category.id} className="flex items-center cursor-pointer hover:bg-accent p-1 rounded">
+                    <input
+                      type="checkbox"
+                      checked={selectedCategories.includes(category.id.toString())}
+                      onChange={() => handleCategoryToggle(category.id.toString())}
+                      className="w-4 h-4 text-primary border-input rounded focus:ring-ring"
+                    />
+                    <span className="ml-2 text-sm text-foreground">{category.name}</span>
+                  </label>
+                ))}
+              </div>
+                          {selectedCategories.length > 0 && (
+                <div className="mt-2 text-xs text-muted-foreground">
+                  {selectedCategories.length} filter{selectedCategories.length !== 1 ? 's' : ''} applied
+                </div>
+              )}
           </div>
         </div>
 
         {/* Results count */}
-        <div className="mt-3 text-sm text-gray-600">
+        <div className="mt-3 text-sm text-muted-foreground">
           {sortedEvents.length} event{sortedEvents.length !== 1 ? 's' : ''} found
         </div>
       </div>
@@ -326,7 +325,7 @@ export default function EventSidebar({
       {/* Events List */}
       <div className="p-2">
         {sortedEvents.length === 0 ? (
-          <div className="p-4 text-center text-gray-500">
+          <div className="p-4 text-center text-muted-foreground">
             <p>No events found</p>
             <p className="text-sm mt-1">Try adjusting your filters</p>
           </div>
@@ -338,8 +337,8 @@ export default function EventSidebar({
                 onClick={() => handleEventClick(event)}
                 className={`p-3 sm:p-4 rounded-lg border cursor-pointer transition-all duration-200 hover:shadow-md hover:scale-[1.02] ${
                   selectedEventId === event.id
-                    ? 'border-blue-500 bg-blue-50 shadow-md'
-                    : 'border-gray-200 hover:border-gray-300'
+                    ? 'border-primary bg-primary/10 shadow-md'
+                    : 'border-border hover:border-border/80 bg-card'
                 }`}
               >
                 {/* Event Image */}
@@ -357,50 +356,41 @@ export default function EventSidebar({
                 )}
 
                 {/* Event Name */}
-                <h3 className="font-semibold text-gray-900 mb-2 leading-tight text-sm sm:text-base">
+                <h3 className="font-semibold text-foreground mb-2 leading-tight text-sm sm:text-base">
                   {event.event_name}
                 </h3>
 
                 {/* Date */}
-                <div className="flex items-center mb-2 text-xs sm:text-sm text-gray-600">
-                  <svg className="w-4 h-4 sm:w-5 sm:h-5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                  </svg>
+                <div className="flex items-center mb-2 text-xs sm:text-sm text-muted-foreground">
+                  <Calendar className="w-4 h-4 sm:w-5 sm:h-5 mr-2 flex-shrink-0" />
                   <span className="leading-tight">{formatDate(event.start_date, event.end_date)}</span>
                 </div>
 
                 {/* Opening Hours */}
                 {event.opening_hours && (
-                  <div className="flex items-center mb-2 text-xs sm:text-sm text-gray-600">
-                    <svg className="w-4 h-4 sm:w-5 sm:h-5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
+                  <div className="flex items-center mb-2 text-xs sm:text-sm text-muted-foreground">
+                    <Clock className="w-4 h-4 sm:w-5 sm:h-5 mr-2 flex-shrink-0" />
                     <span className="leading-tight">{event.opening_hours}</span>
                   </div>
                 )}
 
                 {/* Location */}
                 {event.location_text && (
-                  <div className="flex items-start mb-3 text-xs sm:text-sm text-gray-600">
-                    <svg className="w-4 h-4 sm:w-5 sm:h-5 mr-2 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
+                  <div className="flex items-start mb-3 text-xs sm:text-sm text-muted-foreground">
+                    <MapPin className="w-4 h-4 sm:w-5 sm:h-5 mr-2 mt-0.5 flex-shrink-0" />
                     <span className="leading-tight">{truncateText(event.location_text, isMobile ? 40 : 60)}</span>
                   </div>
                 )}
 
-                {/* Price */}
-                <div className="flex items-center mb-3 text-xs sm:text-sm text-gray-600">
-                  <svg className="w-4 h-4 sm:w-5 sm:h-5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-                  </svg>
-                  <span className="leading-tight font-semibold text-green-700">{formatPrice(event)}</span>
+                {/* Price - Enhanced for accessibility */}
+                <div className="flex items-center mb-3 text-xs sm:text-sm text-muted-foreground">
+                  <DollarSign className="w-4 h-4 sm:w-5 sm:h-5 mr-2 flex-shrink-0 text-success" />
+                  <span className="leading-tight font-semibold text-success">{formatPrice(event)}</span>
                 </div>
 
                 {/* Description */}
                 {event.description && (
-                  <p className="text-xs sm:text-sm text-gray-700 mb-3 leading-relaxed">
+                  <p className="text-xs sm:text-sm text-foreground mb-3 leading-relaxed">
                     {truncateText(event.description, isMobile ? 80 : 120)}
                   </p>
                 )}
@@ -409,17 +399,15 @@ export default function EventSidebar({
                 <div className="flex justify-between items-center">
                   {/* Category */}
                   {event.categories && event.categories.length > 0 && (
-                    <span className="inline-block bg-blue-100 text-blue-800 text-xs sm:text-sm px-2 sm:px-3 py-1 rounded-full font-medium">
+                    <span className="inline-block bg-primary/10 text-primary text-xs sm:text-sm px-2 sm:px-3 py-1 rounded-full font-medium">
                       {categories.find(cat => cat.id === event.categories![0])?.name || 'Category'}
                     </span>
                   )}
                   
-                  {/* Coordinates indicator */}
+                  {/* Coordinates indicator - Enhanced for accessibility */}
                   {event.coordinates && (
-                    <div className="flex items-center text-green-600" title="Click to view on map">
-                      <svg className="w-4 h-4 sm:w-5 sm:h-5 mr-1" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
-                      </svg>
+                    <div className="flex items-center text-success" title="Click to view on map" role="button" tabIndex={0}>
+                      <MapPinned className="w-4 h-4 sm:w-5 sm:h-5 mr-1"/>
                       <span className="text-xs sm:text-sm font-medium">View on map</span>
                     </div>
                   )}

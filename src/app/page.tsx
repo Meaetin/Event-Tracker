@@ -43,9 +43,10 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Features Section */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8 mb-8 md:mb-12 px-4 sm:px-6 lg:px-8 xl:px-20 py-6 md:py-10">
-          <Card className="text-center hover:shadow-lg transition-shadow duration-200">
+        {/* Features Section - Enhanced with section background */}
+        <div className="section-bg-lighter">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8 mb-8 md:mb-12 px-4 sm:px-6 lg:px-8 xl:px-20 py-6 md:py-10">
+          <Card className="text-center card-enhanced">
             <CardHeader>
               <div className="w-10 h-10 sm:w-12 sm:h-12 bg-primary/10 rounded-lg flex items-center justify-center mx-auto mb-3 sm:mb-4">
                 <MapPin className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
@@ -59,7 +60,7 @@ export default function HomePage() {
             </CardContent>
           </Card>
 
-          <Card className="text-center hover:shadow-lg transition-shadow duration-200">
+          <Card className="text-center card-enhanced">
             <CardHeader>
               <div className="w-10 h-10 sm:w-12 sm:h-12 bg-secondary/50 rounded-lg flex items-center justify-center mx-auto mb-3 sm:mb-4">
                 <Filter className="w-5 h-5 sm:w-6 sm:h-6 text-secondary-foreground" />
@@ -73,7 +74,7 @@ export default function HomePage() {
             </CardContent>
           </Card>
 
-          <Card className="text-center hover:shadow-lg transition-shadow duration-200 md:col-span-2 lg:col-span-1">
+          <Card className="text-center card-enhanced md:col-span-2 lg:col-span-1">
             <CardHeader>
               <div className="w-10 h-10 sm:w-12 sm:h-12 bg-accent/50 rounded-lg flex items-center justify-center mx-auto mb-3 sm:mb-4">
                 <Zap className="w-5 h-5 sm:w-6 sm:h-6 text-accent-foreground" />
@@ -91,6 +92,7 @@ export default function HomePage() {
               </CardDescription>
             </CardContent>
           </Card>
+          </div>
         </div>
       </div>
 

@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from '@/components/ui/sheet';
 import { Menu } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { ThemeToggle } from './theme-toggle';
 
 export default function Navbar() {
   const { user: authUser, isLoading: authLoading, signOut } = useAuth();
@@ -101,6 +102,7 @@ export default function Navbar() {
           
           {/* Desktop auth buttons */}
           <div className="hidden md:flex md:items-center md:space-x-2">
+            <ThemeToggle />
             {mounted && authUser ? (
               <Button
                 variant="ghost"
@@ -124,7 +126,8 @@ export default function Navbar() {
           </div>
 
           {/* Mobile menu */}
-          <div className="md:hidden flex items-center">
+          <div className="md:hidden flex items-center space-x-2">
+            <ThemeToggle />
             <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
               <SheetTrigger asChild>
                 <Button variant="ghost" size="icon" className="text-foreground">

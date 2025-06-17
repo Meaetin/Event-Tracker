@@ -9,6 +9,7 @@ import type { LatLngExpression } from 'leaflet';
 import { Icon } from 'leaflet';
 import * as L from 'leaflet';
 import { Calendar, Clock, MapPin, DollarSign, ExternalLink, Navigation } from 'lucide-react';
+import { useTheme } from 'next-themes';
 
 export interface Category {
     id: number; 
@@ -107,6 +108,15 @@ const EventsMap = forwardRef<EventsMapRef, EventsMapProps>(({
   const [currentZoom, setCurrentZoom] = useState<number>(zoom);
   const mapRef = useRef<L.Map | null>(null);
   const markersRef = useRef<{ [key: string]: L.Marker }>({});
+  const { theme, resolvedTheme } = useTheme();
+
+  // Get tile URL based on theme
+  const getTileUrl = () => {
+    const isDark = resolvedTheme === 'dark';
+    return isDark 
+      ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+      : "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png";
+  };
 
   // Expose methods to parent component
   useImperativeHandle(ref, () => ({
@@ -496,9 +506,10 @@ const EventsMap = forwardRef<EventsMapRef, EventsMapProps>(({
           }
         }}
       >
-        <TileLayer 
+                <TileLayer
+          key={resolvedTheme} // Force re-render when theme changes
           attribution='&copy; <a href="https://carto.com/">CARTO</a>'
-          url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+          url={getTileUrl()}
           errorTileUrl="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="
           maxZoom={19}
           keepBuffer={2}
@@ -537,7 +548,7 @@ const EventsMap = forwardRef<EventsMapRef, EventsMapProps>(({
                 autoClose={false}
                 keepInView={true}
               >
-                <div className="p-4 max-w-none">
+                <div className="p-4 max-w-none bg-background">
                   {/* Desktop Layout */}
                   <div className="hidden md:block space-y-3">
                     {/* First Section: Image + Basic Info (Side by Side) */}
@@ -559,32 +570,32 @@ const EventsMap = forwardRef<EventsMapRef, EventsMapProps>(({
                       {/* Basic Info - Right Side */}
                       <div className="flex-1 space-y-1">
                         {/* Event Name */}
-                        <h3 className="font-bold text-lg text-gray-900 leading-tight">
+                        <h3 className="font-bold text-lg text-foreground leading-tight">
                           {event.event_name}
                         </h3>
                         
                         {/* Date */}
-                        <div className="flex items-center text-sm text-gray-600">
+                        <div className="flex items-center text-sm text-muted-foreground">
                           <Calendar className="w-4 h-4 mr-2 flex-shrink-0" />
                           <span>{formatDate(event.start_date, event.end_date)}</span>
                         </div>
                         
                         {/* Time */}
                         {event.opening_hours && (
-                          <div className="flex items-center text-sm text-gray-600">
+                          <div className="flex items-center text-sm text-muted-foreground">
                             <Clock className="w-4 h-4 mr-2 flex-shrink-0" />
                             <span>{event.opening_hours}</span>
                           </div>
                         )}
                         
                         {/* Location */}
-                        <div className="flex items-start text-sm text-gray-600">
+                        <div className="flex items-start text-sm text-muted-foreground">
                           <MapPin className="w-4 h-4 mr-2 mt-0.5 flex-shrink-0" />
                           <span>{event.location_text}</span>
                         </div>
                         
-                        {/* Price */}
-                        <div className="flex items-center text-sm font-medium text-green-700">
+                        {/* Price - Enhanced for accessibility */}
+                        <div className="flex items-center text-sm font-medium text-success">
                           <DollarSign className="w-4 h-4 mr-2 flex-shrink-0" />
                           <span>{formatPrice(event)}</span>
                         </div>
@@ -592,12 +603,12 @@ const EventsMap = forwardRef<EventsMapRef, EventsMapProps>(({
                     </div>
                     
                     {/* Divider */}
-                    <div className="border-t border-gray-200"></div>
+                    <div className="border-t border-border"></div>
                     
                     {/* Second Section: Description (Full Width) */}
                     {event.description && (
                       <div>
-                        <p className="text-sm text-gray-700 leading-relaxed">
+                        <p className="text-sm text-foreground leading-relaxed">
                           {event.description}
                         </p>
                       </div>
@@ -615,20 +626,20 @@ const EventsMap = forwardRef<EventsMapRef, EventsMapProps>(({
                               return (
                                 <span 
                                   key={`category-${categoryId}-${index}`}
-                                  className="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full"
+                                  className="inline-block bg-primary/10 text-primary text-xs px-2 py-1 rounded-full"
                                 >
                                   {categoryName}
                                 </span>
                               );
                             })}
                             {event.categories.length > 3 && (
-                              <span className="inline-block bg-gray-100 text-gray-600 text-xs px-2 py-1 rounded-full">
+                              <span className="inline-block bg-muted text-muted-foreground text-xs px-2 py-1 rounded-full">
                                 +{event.categories.length - 3} more
                               </span>
                             )}
                           </div>
                         ) : (
-                          <span className="inline-block bg-gray-100 text-gray-600 text-xs px-2 py-1 rounded-full">
+                          <span className="inline-block bg-muted text-muted-foreground text-xs px-2 py-1 rounded-full">
                             Uncategorized
                           </span>
                         )}
@@ -643,19 +654,19 @@ const EventsMap = forwardRef<EventsMapRef, EventsMapProps>(({
                             target="_blank" 
                             rel="noopener noreferrer"
                             title="View Details"
-                            className="inline-flex items-center justify-center bg-blue-50 hover:bg-blue-100 text-blue-600 hover:text-blue-800 text-sm font-medium w-8 h-8 rounded-lg transition-colors border border-blue-200"
+                            className="inline-flex items-center justify-center bg-primary/10 hover:bg-primary/20 text-primary hover:text-primary/80 text-sm font-medium w-8 h-8 rounded-lg transition-colors border border-primary/20"
                           >
                             <ExternalLink className="w-4 h-4" />
                           </a>
                         )}
                         
-                        {/* Google Maps Link */}
+                        {/* Google Maps Link - Enhanced for accessibility */}
                         <a 
                           href={getGoogleMapsUrl(event)} 
                           target="_blank" 
                           rel="noopener noreferrer"
                           title="Open in Google Maps"
-                          className="inline-flex items-center justify-center bg-green-50 hover:bg-green-100 text-green-600 hover:text-green-800 text-sm font-medium w-8 h-8 rounded-lg transition-colors border border-green-200"
+                          className="success-indicator inline-flex items-center justify-center text-sm font-medium w-8 h-8 rounded-lg transition-colors hover:bg-success/20"
                         >
                           <Navigation className="w-4 h-4" />
                         </a>
@@ -684,32 +695,32 @@ const EventsMap = forwardRef<EventsMapRef, EventsMapProps>(({
                       {/* Basic Info */}
                       <div className="space-y-2">
                         {/* Event Name */}
-                        <h3 className="font-bold text-lg text-gray-900 leading-tight">
+                        <h3 className="font-bold text-lg text-foreground leading-tight">
                           {event.event_name}
                         </h3>
                         
                         {/* Date */}
-                        <div className="flex items-center text-sm text-gray-600">
+                        <div className="flex items-center text-sm text-muted-foreground">
                           <Calendar className="w-4 h-4 mr-2 flex-shrink-0" />
                           <span>{formatDate(event.start_date, event.end_date)}</span>
                         </div>
                         
                         {/* Time */}
                         {event.opening_hours && (
-                          <div className="flex items-center text-sm text-gray-600">
+                          <div className="flex items-center text-sm text-muted-foreground">
                             <Clock className="w-4 h-4 mr-2 flex-shrink-0" />
                             <span>{event.opening_hours}</span>
                           </div>
                         )}
                         
                         {/* Location */}
-                        <div className="flex items-start text-sm text-gray-600">
+                        <div className="flex items-start text-sm text-muted-foreground">
                           <MapPin className="w-4 h-4 mr-2 mt-0.5 flex-shrink-0" />
                           <span>{event.location_text}</span>
                         </div>
                         
-                        {/* Price */}
-                        <div className="flex items-center text-sm font-medium text-green-700">
+                        {/* Price - Enhanced for accessibility */}
+                        <div className="flex items-center text-sm font-medium text-success">
                           <DollarSign className="w-4 h-4 mr-2 flex-shrink-0" />
                           <span>{formatPrice(event)}</span>
                         </div>
@@ -717,12 +728,12 @@ const EventsMap = forwardRef<EventsMapRef, EventsMapProps>(({
                     </div>
                     
                     {/* Divider */}
-                    <div className="border-t border-gray-200"></div>
+                    <div className="border-t border-border"></div>
                     
                     {/* Second Section: Description */}
                     {event.description && (
                       <div>
-                        <p className="text-sm text-gray-700 leading-relaxed">
+                        <p className="text-sm text-foreground leading-relaxed">
                           {event.description}
                         </p>
                       </div>
@@ -740,20 +751,20 @@ const EventsMap = forwardRef<EventsMapRef, EventsMapProps>(({
                               return (
                                 <span 
                                   key={`category-${categoryId}-${index}`}
-                                  className="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full"
+                                  className="inline-block bg-primary/10 text-primary text-xs px-2 py-1 rounded-full"
                                 >
                                   {categoryName}
                                 </span>
                               );
                             })}
                             {event.categories.length > 2 && (
-                              <span className="inline-block bg-gray-100 text-gray-600 text-xs px-2 py-1 rounded-full">
+                              <span className="inline-block bg-muted text-muted-foreground text-xs px-2 py-1 rounded-full">
                                 +{event.categories.length - 2} more
                               </span>
                             )}
                           </div>
                         ) : (
-                          <span className="inline-block bg-gray-100 text-gray-600 text-xs px-2 py-1 rounded-full">
+                          <span className="inline-block bg-muted text-muted-foreground text-xs px-2 py-1 rounded-full">
                             Uncategorized
                           </span>
                         )}
@@ -768,19 +779,19 @@ const EventsMap = forwardRef<EventsMapRef, EventsMapProps>(({
                             target="_blank" 
                             rel="noopener noreferrer"
                             title="View Details"
-                            className="inline-flex items-center justify-center bg-blue-50 hover:bg-blue-100 text-blue-600 hover:text-blue-800 text-sm font-medium w-8 h-8 rounded-lg transition-colors border border-blue-200"
+                            className="inline-flex items-center justify-center bg-primary/10 hover:bg-primary/20 text-primary hover:text-primary/80 text-sm font-medium w-8 h-8 rounded-lg transition-colors border border-primary/20"
                           >
                             <ExternalLink className="w-4 h-4" />
                           </a>
                         )}
                         
-                        {/* Google Maps Link */}
+                        {/* Google Maps Link - Enhanced for accessibility */}
                         <a 
                           href={getGoogleMapsUrl(event)} 
                           target="_blank" 
                           rel="noopener noreferrer"
                           title="Open in Google Maps"
-                          className="inline-flex items-center justify-center bg-green-50 hover:bg-green-100 text-green-600 hover:text-green-800 text-sm font-medium w-8 h-8 rounded-lg transition-colors border border-green-200"
+                          className="success-indicator inline-flex items-center justify-center text-sm font-medium w-8 h-8 rounded-lg transition-colors hover:bg-success/20"
                         >
                           <Navigation className="w-4 h-4" />
                         </a>
@@ -796,8 +807,8 @@ const EventsMap = forwardRef<EventsMapRef, EventsMapProps>(({
       
       {/* Events counter */}
       {!loading && (
-        <div className="absolute bottom-4 left-4 z-[1000] bg-white px-3 py-2 rounded-lg shadow-md">
-          <span className="text-sm text-gray-600">
+        <div className="absolute bottom-4 left-4 z-[1000] bg-background border border-border px-3 py-2 rounded-lg shadow-md">
+          <span className="text-sm text-muted-foreground">
             {validEvents.length} event{validEvents.length !== 1 ? 's' : ''} displayed
           </span>
         </div>

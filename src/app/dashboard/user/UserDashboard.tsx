@@ -19,7 +19,7 @@ export default function UserDashboard() {
             </p>
           </div>
           <Button asChild>
-            <Link href="/events">
+            <Link href="/map">
               <MapPin className="w-4 h-4 mr-2" />
               Explore Events
             </Link>

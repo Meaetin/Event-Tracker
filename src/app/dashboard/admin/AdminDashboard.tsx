@@ -491,9 +491,10 @@ export default function AdminDashboard() {
           </Button>
         </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card>
+        {/* Stats Cards - Enhanced with section background */}
+        <div className="section-bg-light p-6 rounded-lg">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Card className="card-enhanced">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total Events</CardTitle>
               <Calendar className="h-4 w-4 text-muted-foreground" />
@@ -506,7 +507,7 @@ export default function AdminDashboard() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="card-enhanced">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Pending Review</CardTitle>
               <Clock className="h-4 w-4 text-muted-foreground" />
@@ -519,7 +520,7 @@ export default function AdminDashboard() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="card-enhanced">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Processing Queue</CardTitle>
               <Clock className="h-4 w-4 text-muted-foreground" />
@@ -532,7 +533,7 @@ export default function AdminDashboard() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="card-enhanced">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Processed Events</CardTitle>
               <CheckCircle className="h-4 w-4 text-muted-foreground" />
@@ -544,6 +545,7 @@ export default function AdminDashboard() {
               </p>
             </CardContent>
           </Card>
+          </div>
         </div>
 
         {/* Main Content Tabs */}
@@ -634,7 +636,7 @@ export default function AdminDashboard() {
                       {pendingListings.map(item => {
                         const isProcessing = processingItems.has(item.id);
                         return (
-                          <div key={item.id} className="rounded-xl border p-4 flex gap-6 bg-white shadow-sm">
+                          <div key={item.id} className="rounded-xl border p-4 flex gap-6 bg-background shadow-sm">
                             <div className="flex-shrink-0">
                               {item.image_url ? (
                                 <img src={item.image_url} alt={item.title} className="w-60 h-32 object-cover rounded-lg" />
@@ -770,8 +772,9 @@ export default function AdminDashboard() {
           </TabsContent>
 
           <TabsContent value="process" className="space-y-4">
-            {/* Direct URL Addition Form */}
-            <Card>
+            {/* Direct URL Addition Form - Enhanced with section background */}
+            <div className="section-bg-soft p-6 rounded-lg">
+              <Card className="card-enhanced">
               <CardHeader>
                 <CardTitle>Add URL Directly to Processing Queue</CardTitle>
                 <CardDescription>Add a URL directly to be processed with FireCrawl and AI without scraping first.</CardDescription>
@@ -812,6 +815,7 @@ export default function AdminDashboard() {
                 </form>
               </CardContent>
             </Card>
+            </div>
 
             {/* Processing Queue */}
             <Card>
@@ -984,7 +988,7 @@ export default function AdminDashboard() {
                 ) : (
                   <div className="space-y-4">
                     {processedEvents.map(event => (
-                      <div key={event.id} className="rounded-xl border p-4 flex gap-6 bg-white shadow-sm">
+                      <div key={event.id} className="rounded-xl border p-4 flex gap-6 bg-background shadow-sm">
                         <div className="flex-shrink-0">
                           {event.image_url ? (
                             <img src={event.image_url} alt={event.event_name} className="w-60 h-32 object-cover rounded-lg" />
