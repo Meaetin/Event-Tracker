@@ -21,8 +21,9 @@ export const viewport = {
 
 function LoadingSpinner() {
   return (
-    <div className="flex justify-center items-center min-h-screen">
-      <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+    <div className="flex flex-col justify-center items-center min-h-screen bg-background">
+      <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary border-t-transparent mb-4"></div>
+      <span className="text-foreground text-lg font-medium">Loading...</span>
     </div>
   );
 }

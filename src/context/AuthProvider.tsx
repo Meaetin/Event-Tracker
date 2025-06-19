@@ -125,7 +125,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   if (isLoading) { // If the user is loading, return a loading message
-    return <div className="p-6 text-center">Loading...</div>;
+    return (
+      <div className="flex flex-col justify-center items-center min-h-screen bg-background">
+        <div className="animate-spin rounded-full h-16 w-16 border-4 border-solid border-gray-200 border-t-primary mb-6"></div>
+        <span className="text-foreground text-xl font-semibold">Loading...</span>
+      </div>
+    );
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

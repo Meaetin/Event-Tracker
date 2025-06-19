@@ -110,7 +110,7 @@ const EventsMap = forwardRef<EventsMapRef, EventsMapProps>(({
   const [favouriteLoading, setFavouriteLoading] = useState<Set<string>>(new Set());
   const mapRef = useRef<L.Map | null>(null);
   const markersRef = useRef<{ [key: string]: L.Marker }>({});
-  const { theme, resolvedTheme } = useTheme();
+  const { resolvedTheme } = useTheme();
 
   // Get tile URL based on theme
   const getTileUrl = () => {
