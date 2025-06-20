@@ -555,7 +555,7 @@ export default function PlannerPage() {
                   aria-labelledby="categories-label"
                 >
                   <p id="categories-label" className="sr-only">
-                    Select categories of events you're interested in
+                    Select categories of events you&apos;re interested in
                   </p>
                   {CATEGORIES.map((category) => (
                     <label
@@ -592,7 +592,7 @@ export default function PlannerPage() {
                       </div>
                       <span className="text-sm font-medium">{category.name}</span>
                       <span id={`category-${category.id}-desc`} className="sr-only">
-                        {formData.selectedCategories.includes(category.id) ? 'Selected' : 'Not selected'}
+                        {formData.selectedCategories.includes(category.id) ? "Selected" : "Not selected"}
                       </span>
                     </label>
                   ))}
@@ -743,7 +743,7 @@ export default function PlannerPage() {
                 Your AI-Generated Plan
               </CardTitle>
               <CardDescription>
-                Based on your preferences, here's what we found
+                Based on your preferences, here&apos;s what we found
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -799,7 +799,7 @@ export default function PlannerPage() {
                               {/* What you'll do */}
                               {(item.what_youll_do || item.detailed_breakdown) && (
                                 <div className="bg-green-50 dark:bg-green-950/20 p-4 rounded text-sm">
-                                  <strong className="text-green-900 dark:text-green-100">🎯 What you'll do:</strong>
+                                  <strong className="text-green-900 dark:text-green-100">🎯 What you&apos;ll do:</strong>
                                   <div className="mt-2 space-y-1">
                                     {item.what_youll_do ? (
                                       Array.isArray(item.what_youll_do) ? (
@@ -819,7 +819,7 @@ export default function PlannerPage() {
                                       // Fallback to detailed_breakdown if what_youll_do is not available
                                       item.detailed_breakdown.split('\n').filter((line: string) => line.trim()).map((line: string, idx: number) => {
                                         const trimmedLine = line.trim().replace(/^[•\-\*]\s*/, '');
-                                        const isSubItem = line.includes('–') || line.startsWith('  ') || line.startsWith('\t');
+                                        const isSubItem = line.includes('-') || line.startsWith('  ') || line.startsWith('\t');
                                         
                                         return (
                                           <div key={idx} className={`flex items-start gap-2 ${isSubItem ? 'ml-4' : ''}`}>
