@@ -82,7 +82,16 @@ export default function EventSidebar({
     }
   };
 
-  const formatDate = (startDate: string | null, endDate: string | null) => {
+  const formatDate = (event: MapEvent) => {
+    // Prioritize date_text if available
+    if (event.date_text) {
+      return event.date_text;
+    }
+    
+    // Fallback to start_date/end_date formatting
+    const startDate = event.start_date;
+    const endDate = event.end_date;
+    
     if (!startDate) return 'Date TBA';
     
     // Handle special text dates that shouldn't be parsed
@@ -155,6 +164,11 @@ export default function EventSidebar({
   };
 
   const filteredEvents = events.filter(event => {
+    // Filter out events that are over (only show active events)
+    if (event.is_over === true) {
+      return false;
+    }
+
     // Category filter
     if (selectedCategories.length > 0) {
       if (!event.categories || event.categories.length === 0) {
@@ -318,7 +332,7 @@ export default function EventSidebar({
 
         {/* Results count */}
         <div className="mt-3 text-sm text-muted-foreground">
-          {sortedEvents.length} event{sortedEvents.length !== 1 ? 's' : ''} found
+          {sortedEvents.length} active event{sortedEvents.length !== 1 ? 's' : ''} found
         </div>
       </div>
 
@@ -363,7 +377,7 @@ export default function EventSidebar({
                 {/* Date */}
                 <div className="flex items-center mb-2 text-xs sm:text-sm text-muted-foreground">
                   <Calendar className="w-4 h-4 sm:w-5 sm:h-5 mr-2 flex-shrink-0" />
-                  <span className="leading-tight">{formatDate(event.start_date, event.end_date)}</span>
+                  <span className="leading-tight">{formatDate(event)}</span>
                 </div>
 
                 {/* Opening Hours */}

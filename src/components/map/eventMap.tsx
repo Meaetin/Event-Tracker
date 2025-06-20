@@ -42,6 +42,7 @@ export interface Event {
     page_url: string | null;
     image_url: string | null;
     date_text: string | null;
+    is_over: boolean | null;
 }
 
 // Map-specific types
@@ -394,7 +395,16 @@ const EventsMap = forwardRef<EventsMapRef, EventsMapProps>(({
     }
   };
 
-  const formatDate = (startDate: string | null, endDate: string | null) => {
+  const formatDate = (event: MapEvent) => {
+    // Prioritize date_text if available
+    if (event.date_text) {
+      return event.date_text;
+    }
+    
+    // Fallback to start_date/end_date formatting
+    const startDate = event.start_date;
+    const endDate = event.end_date;
+    
     if (!startDate) return 'Date TBA';
     
     // Handle special text dates that shouldn't be parsed
@@ -516,8 +526,13 @@ const EventsMap = forwardRef<EventsMapRef, EventsMapProps>(({
     }
   };
 
-  // Filter events that have valid coordinates and match selected category
+  // Filter events that have valid coordinates, match selected category, and are not over
   const validEvents = events.filter(event => {
+    // Filter out events that are over
+    if (event.is_over === true) {
+      return false;
+    }
+    
     const hasValidCoordinates = event.coordinates && 
       typeof event.coordinates.latitude === 'number' && 
       typeof event.coordinates.longitude === 'number' &&
@@ -683,7 +698,7 @@ const EventsMap = forwardRef<EventsMapRef, EventsMapProps>(({
                         {/* Date */}
                         <div className="flex items-center text-sm text-muted-foreground">
                           <Calendar className="w-4 h-4 mr-2 flex-shrink-0" />
-                          <span>{formatDate(event.start_date, event.end_date)}</span>
+                          <span>{formatDate(event)}</span>
                         </div>
                         
                         {/* Time */}
@@ -808,7 +823,7 @@ const EventsMap = forwardRef<EventsMapRef, EventsMapProps>(({
                         {/* Date */}
                         <div className="flex items-center text-sm text-muted-foreground">
                           <Calendar className="w-4 h-4 mr-2 flex-shrink-0" />
-                          <span>{formatDate(event.start_date, event.end_date)}</span>
+                          <span>{formatDate(event)}</span>
                         </div>
                         
                         {/* Time */}
@@ -915,7 +930,7 @@ const EventsMap = forwardRef<EventsMapRef, EventsMapProps>(({
       {!loading && (
         <div className="absolute bottom-4 left-4 z-[1000] bg-background border border-border px-3 py-2 rounded-lg shadow-md">
           <span className="text-sm text-muted-foreground">
-            {validEvents.length} event{validEvents.length !== 1 ? 's' : ''} displayed
+            {validEvents.length} active event{validEvents.length !== 1 ? 's' : ''} displayed
           </span>
         </div>
       )}
